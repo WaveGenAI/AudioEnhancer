@@ -1,4 +1,3 @@
-#
 # Created on Thu May 23 2024
 #
 # The MIT License (MIT)
@@ -19,13 +18,17 @@
 # TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 
+""" 
+Generate the encoded audio
+"""
+
 import io
 
 import torchaudio
 from encodec import EncodecModel
 from encodec.utils import convert_audio
 
-import data.codec.codec as codec
+from data.codec import codec
 
 
 class Encodec(codec.Codec):

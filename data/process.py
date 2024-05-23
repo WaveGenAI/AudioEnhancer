@@ -23,13 +23,15 @@
 Module to build the dataset
 """
 
+import os
+import typing
 
 from data.codec.codec import Codec
-import typing
-import os
 
 
 class DatasetBuilder:
+    """Class to build the dataset"""
+
     def __init__(self, codec: typing.List[type[Codec]]):
         self._codec = codec
 
