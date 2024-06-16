@@ -13,7 +13,7 @@ from dataset.codec.codec import Codec
 class Encodec(Codec):
     """Class that encode the audio"""
 
-    def __init__(self, bandewidth: int = 6) -> None:
+    def __init__(self, bandewidth: int = 6, max_length: int = 180) -> None:
         self._model = EncodecModel.encodec_model_24khz()
         self._model.set_target_bandwidth(bandewidth)
 
@@ -22,6 +22,7 @@ class Encodec(Codec):
             self._device = torch.device("cuda")
 
         self._model.to(self._device)
+        self._max_length = max_length
 
     def _load_audio(self, audio_path: str) -> torch.Tensor:
         """Function to load the audio
@@ -35,6 +36,10 @@ class Encodec(Codec):
 
         wav, sr = torchaudio.load(audio_path)
         wav = convert_audio(wav, sr, self._model.sample_rate, self._model.channels)
+
+        # fix max audio length to self._max_length minutes (avoid memory issues)
+        if wav.shape[-1] > self._max_length * self._model.sample_rate:
+            wav = wav[:, : self._max_length * self._model.sample_rate]
 
         return wav[None].to(self._device)
 
