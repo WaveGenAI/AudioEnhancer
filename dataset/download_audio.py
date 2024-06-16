@@ -6,7 +6,6 @@ import hashlib
 import os
 import shutil
 import tempfile
-from pathlib import Path
 
 import requests
 from tqdm import tqdm

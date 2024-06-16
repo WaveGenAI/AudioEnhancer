@@ -2,7 +2,6 @@
 Module that contain an abstract class for codec
 """
 
-import io
 from abc import abstractmethod
 
 
@@ -10,23 +9,14 @@ class Codec:
     """Abstract class for codec"""
 
     @abstractmethod
-    def encode(self, audio_path: str) -> io.BytesIO:
-        """Encode the audio and return a BytesIO object
+    def encoder_decoder(self, audio_path: str, target_path: str) -> None:
+        """Encode and decode the audio
 
         Args:
-            audio_path (str): The file name of the audio
-
-        Returns:
-            io.BytesIO: The BytesIO object of the encoded audio
+            audio_path (str): The file path of the audio
+            target_path (str): The file path to save the audio
         """
 
     @abstractmethod
-    def decode(self, audio: io.BytesIO) -> io.BytesIO:
-        """Decode the audio and return a BytesIO object
-
-        Args:
-            audio (io.BytesIO): The BytesIO object of the audio
-
-        Returns:
-            io.BytesIO: The BytesIO object of the decoded audio
-        """
+    def __str__(self) -> str:
+        """Return the name of the codec"""

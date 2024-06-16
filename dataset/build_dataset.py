@@ -3,8 +3,9 @@ Module to build the dataset
 """
 
 import os
+import shutil
 
-from dataset.codec import *
+from dataset.codec import Encodec
 
 CODEC = [Encodec()]
 
@@ -19,8 +20,9 @@ def create_dir(dir_path: str):
     if not os.path.exists(dir_path):
         os.makedirs(dir_path)
 
-    for codec in CODEC:
-        os.makedirs(os.path.join(dir_path, str(codec)))
+    for used_codec in CODEC:
+        if not os.path.exists(os.path.join(dir_path, str(used_codec))):
+            os.makedirs(os.path.join(dir_path, str(used_codec)))
 
 
 def build_ds(audio_dir: str, dataset_dir: str):
@@ -35,7 +37,11 @@ def build_ds(audio_dir: str, dataset_dir: str):
     create_dir(dataset_dir)
 
     for files in os.listdir(audio_dir):
-        for codec in CODEC:
+        for used_codec in CODEC:
             file_path = os.path.join(audio_dir, files)
-            encoded = codec.encode(file_path)
-            decodec = codec.decode(encoded)
+            target_path = os.path.join(dataset_dir, str(used_codec), files)
+
+            # copy the file to the dataset directory
+            shutil.copy(file_path, dataset_dir)
+
+            used_codec.encoder_decoder(file_path, target_path)
