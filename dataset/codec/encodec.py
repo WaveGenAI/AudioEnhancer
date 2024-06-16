@@ -17,6 +17,13 @@ class Encodec(Codec):
         self._model = EncodecModel.encodec_model_24khz()
         self._model.set_target_bandwidth(bandewidth)
 
+        if torch.cuda.is_available():
+            self._device = torch.device("cuda")
+        else:
+            self._device = torch.device("cpu")
+
+        self._model.to(self._device)
+
     def _load_audio(self, audio_path: str) -> torch.Tensor:
         """Function to load the audio
 
@@ -43,13 +50,16 @@ class Encodec(Codec):
         print(f"Encoding {audio_path} to {target_path} with Encodec")
 
         audio = self._load_audio(audio_path)
+        audio = audio[None].to(self._device)
 
         with torch.no_grad():
-            compressed = self._model.encode(audio[None])
+            compressed = self._model.encode(audio)
             decompressed = self._model.decode(compressed)
 
             decompressed = decompressed[0, :, : audio.shape[-1]]
 
+        # move decompressed to cpu
+        decompressed = decompressed.cpu()
         save_audio(decompressed, target_path, self._model.sample_rate)
 
     def __str__(self) -> str:
