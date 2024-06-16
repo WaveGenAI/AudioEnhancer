@@ -2,4 +2,5 @@
 Importing all the classes from the codec module.
 """
 
-from data.codec.encodec import Encodec
+from .codec import *
+from .encodec import *
