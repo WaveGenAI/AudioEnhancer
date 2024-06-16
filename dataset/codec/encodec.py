@@ -17,10 +17,9 @@ class Encodec(Codec):
         self._model = EncodecModel.encodec_model_24khz()
         self._model.set_target_bandwidth(bandewidth)
 
+        self._device = torch.device("cpu")
         if torch.cuda.is_available():
             self._device = torch.device("cuda")
-        else:
-            self._device = torch.device("cpu")
 
         self._model.to(self._device)
 
@@ -37,7 +36,7 @@ class Encodec(Codec):
         wav, sr = torchaudio.load(audio_path)
         wav = convert_audio(wav, sr, self._model.sample_rate, self._model.channels)
 
-        return wav
+        return wav[None].to(self._device)
 
     def encoder_decoder(self, audio_path: str, target_path: str) -> None:
         """Encode and decode the audio using Encodec
@@ -50,7 +49,6 @@ class Encodec(Codec):
         print(f"Encoding {audio_path} to {target_path} with Encodec")
 
         audio = self._load_audio(audio_path)
-        audio = audio[None].to(self._device)
 
         with torch.no_grad():
             compressed = self._model.encode(audio)
@@ -58,9 +56,7 @@ class Encodec(Codec):
 
             decompressed = decompressed[0, :, : audio.shape[-1]]
 
-        # move decompressed to cpu
-        decompressed = decompressed.cpu()
-        save_audio(decompressed, target_path, self._model.sample_rate)
+        save_audio(decompressed.cpu(), target_path, self._model.sample_rate)
 
     def __str__(self) -> str:
         return "encodec"

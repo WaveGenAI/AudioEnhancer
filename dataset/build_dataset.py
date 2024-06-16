@@ -37,11 +37,11 @@ def build_ds(audio_dir: str, dataset_dir: str):
     create_dir(dataset_dir)
 
     for files in os.listdir(audio_dir):
+        file_path = os.path.join(audio_dir, files)
+
+        # copy the file to the dataset directory
+        shutil.copy(file_path, dataset_dir)
+
         for used_codec in CODEC:
-            file_path = os.path.join(audio_dir, files)
             target_path = os.path.join(dataset_dir, str(used_codec), files)
-
-            # copy the file to the dataset directory
-            shutil.copy(file_path, dataset_dir)
-
             used_codec.encoder_decoder(file_path, target_path)
