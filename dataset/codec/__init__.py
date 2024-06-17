@@ -6,3 +6,4 @@ from .encodec import *
 from .soundstream import *
 from .opus import *
 from .dac import *
+from .codec import *
