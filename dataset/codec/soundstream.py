@@ -12,7 +12,13 @@ from dataset.codec.codec import Codec
 class Soundstream(Codec):
     """Class that encode the audio"""
 
-    def __init__(self) -> None:
+    def __init__(self, max_length: int = 180) -> None:
+        """Initialize the Soundstream model
+
+        Args:
+            max_length (int, optional): the max duration of an audio. Defaults to 180.
+        """
+
         self._model = from_pretrained()
 
         self._device = torch.device("cpu")
@@ -20,6 +26,7 @@ class Soundstream(Codec):
             self._device = torch.device("cuda")
 
         self._model.to(self._device)
+        self._max_length = max_length
 
     def _load_audio(self, audio_path: str) -> torch.Tensor:
         """Function to load the audio
@@ -32,6 +39,11 @@ class Soundstream(Codec):
         """
 
         wav = load(audio_path)
+
+        # fix max audio length to self._max_length minutes (avoid memory issues)
+        if wav.shape[-1] > self._max_length * 16000:
+            wav = wav[:, : self._max_length * 16000]
+
         return wav.to(self._device)
 
     def encoder_decoder(self, audio_path: str, target_path: str) -> None:

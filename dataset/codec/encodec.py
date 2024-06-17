@@ -14,6 +14,13 @@ class Encodec(Codec):
     """Class that encode the audio"""
 
     def __init__(self, bandewidth: int = 6, max_length: int = 180) -> None:
+        """Initialize the Encodec model
+
+        Args:
+            bandewidth (int, optional): the target bandewidth. Defaults to 6.
+            max_length (int, optional): the max duration of the audio. Defaults to 180.
+        """
+
         self._model = EncodecModel.encodec_model_24khz()
         self._model.set_target_bandwidth(bandewidth)
 
