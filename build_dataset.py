@@ -13,18 +13,24 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
     "--audio_dir",
     type=str,
-    required=True,
+    default="./media/works/data/",
+    required=False,
     help="The directory containing the audio files",
 )
 parser.add_argument(
-    "--dataset_dir", type=str, required=True, help="The directory to save the dataset"
+    "--dataset_dir",
+    type=str,
+    default="./media/works/dataset",
+    required=False,
+    help="The directory to save the dataset",
 )
 
 parser.add_argument(
     "--codec",
     type=str,
     nargs="+",
-    required=True,
+    default=["soundstream"],
+    required=False,
     help="The codecs to use, supported codecs: dac, encodec, soundstream, opus. Example: --codec dac encodec",
 )
 

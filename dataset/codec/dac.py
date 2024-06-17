@@ -12,11 +12,11 @@ from dataset.codec.codec import Codec
 class DAC(Codec):
     """Class that encode the audio"""
 
-    def __init__(self, max_lenght: int = 30) -> None:
+    def __init__(self, max_length: int = 30) -> None:
         """Initialize the DAC codec
 
         Args:
-            max_lenght (int, optional): the max lenght of an audio. Defaults to 30.
+            max_length (int, optional): the max length of an audio. Defaults to 30.
         """
 
         model_path = dac.utils.download(model_type="16khz")
@@ -27,7 +27,7 @@ class DAC(Codec):
             self._device = torch.device("cuda")
 
         self._model.to(self._device)
-        self._max_lenght = max_lenght
+        self._max_length = max_length
 
     def _load_audio(self, audio_path: str) -> torch.Tensor:
         """Function to load the audio
@@ -39,7 +39,7 @@ class DAC(Codec):
             torch.Tensor: The audio tensor
         """
 
-        wav = AudioSignal(audio_path, duration=self._max_lenght)
+        wav = AudioSignal(audio_path, duration=self._max_length)
         wav.resample(self._model.sample_rate)
 
         return wav.to(self._device)

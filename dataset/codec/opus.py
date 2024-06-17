@@ -12,14 +12,14 @@ from dataset.codec.codec import Codec
 class Opus(Codec):
     """Class that encode the audio"""
 
-    def __init__(self, bandewidth: int = 16) -> None:
+    def __init__(self, k_sample_rate: int = 16) -> None:
         """Initialize the Opus codec
 
         Args:
-            bandewidth (int, optional): the bitrate of the audio. Defaults to 16.
+            k_sample_rate (int, optional): the bitrate of the audio. Defaults to 16.
         """
 
-        self._bandwidth = f"{bandewidth}k"
+        self._bandwidth = f"{k_sample_rate}k"
 
     def encoder_decoder(self, audio_path: str, target_path: str) -> None:
         """Encode and decode the audio using Opus

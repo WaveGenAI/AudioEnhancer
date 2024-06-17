@@ -26,6 +26,7 @@ class Soundstream(Codec):
             self._device = torch.device("cuda")
 
         self._model.to(self._device)
+        self._model.eval()
         self._max_length = max_length
 
     def _load_audio(self, audio_path: str) -> torch.Tensor:
@@ -41,7 +42,6 @@ class Soundstream(Codec):
         wav = load(audio_path)
 
         # fix max audio length to self._max_length seconds (avoid memory issues)
-
         if wav.shape[-1] > self._max_length * 16000:
             wav = wav[:, :, : self._max_length * 16000]
 
