@@ -3,3 +3,5 @@ torchaudio
 encodec
 requests
 tqdm
+soundstream
+huggingface_hub

@@ -5,9 +5,10 @@ Module to build the dataset
 import os
 import shutil
 
-from dataset.codec import Encodec
+from dataset.codec import Encodec, Soundstream
 
-CODEC = [Encodec()]
+
+CODEC = [Soundstream(), Encodec()]
 
 
 def create_dir(dir_path: str):
@@ -36,12 +37,12 @@ def build_ds(audio_dir: str, dataset_dir: str):
     print("Building the dataset...")
     create_dir(dataset_dir)
 
-    for files in os.listdir(audio_dir):
-        file_path = os.path.join(audio_dir, files)
+    for used_codec in CODEC:
+        for files in os.listdir(audio_dir):
+            file_path = os.path.join(audio_dir, files)
 
-        # copy the file to the dataset directory
-        shutil.copy(file_path, dataset_dir)
+            # copy the file to the dataset directory
+            shutil.copy(file_path, dataset_dir)
 
-        for used_codec in CODEC:
             target_path = os.path.join(dataset_dir, str(used_codec), files)
             used_codec.encoder_decoder(file_path, target_path)
