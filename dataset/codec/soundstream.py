@@ -40,9 +40,10 @@ class Soundstream(Codec):
 
         wav = load(audio_path)
 
-        # fix max audio length to self._max_length minutes (avoid memory issues)
+        # fix max audio length to self._max_length seconds (avoid memory issues)
+
         if wav.shape[-1] > self._max_length * 16000:
-            wav = wav[:, : self._max_length * 16000]
+            wav = wav[:, :, : self._max_length * 16000]
 
         return wav.to(self._device)
 

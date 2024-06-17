@@ -44,7 +44,7 @@ class Encodec(Codec):
         wav, sr = torchaudio.load(audio_path)
         wav = convert_audio(wav, sr, self._model.sample_rate, self._model.channels)
 
-        # fix max audio length to self._max_length minutes (avoid memory issues)
+        # fix max audio length to self._max_length seconds (avoid memory issues)
         if wav.shape[-1] > self._max_length * self._model.sample_rate:
             wav = wav[:, : self._max_length * self._model.sample_rate]
 
