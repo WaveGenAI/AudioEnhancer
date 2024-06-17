@@ -7,9 +7,9 @@ import shutil
 
 import tqdm
 
-from dataset.codec import Encodec, Opus, Soundstream
+from dataset.codec import Encodec, Opus, Soundstream, DAC
 
-CODEC = [Opus(), Soundstream(), Encodec()]
+CODEC = [DAC(), Opus(), Soundstream(), Encodec()]
 
 
 def create_dir(dir_path: str):

@@ -6,3 +6,4 @@ tqdm
 soundstream
 huggingface_hub
 ffmpeg-python
+descript-audio-codec
