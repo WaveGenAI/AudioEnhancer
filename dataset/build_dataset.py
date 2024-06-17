@@ -5,10 +5,11 @@ Module to build the dataset
 import os
 import shutil
 
-from dataset.codec import Encodec, Soundstream
+import tqdm
 
+from dataset.codec import Encodec, Opus, Soundstream
 
-CODEC = [Soundstream(), Encodec()]
+CODEC = [Opus(), Soundstream(), Encodec()]
 
 
 def create_dir(dir_path: str):
@@ -37,6 +38,12 @@ def build_ds(audio_dir: str, dataset_dir: str):
     print("Building the dataset...")
     create_dir(dataset_dir)
 
+    total_files = len(os.listdir(audio_dir))
+    total_operations = total_files * len(CODEC)
+    progress_bar = tqdm.tqdm(
+        total=total_operations, desc="Processing files", unit="file"
+    )
+
     for used_codec in CODEC:
         for files in os.listdir(audio_dir):
             file_path = os.path.join(audio_dir, files)
@@ -46,3 +53,5 @@ def build_ds(audio_dir: str, dataset_dir: str):
 
             target_path = os.path.join(dataset_dir, str(used_codec), files)
             used_codec.encoder_decoder(file_path, target_path)
+
+            progress_bar.update(1)

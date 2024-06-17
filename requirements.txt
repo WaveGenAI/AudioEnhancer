@@ -5,3 +5,4 @@ requests
 tqdm
 soundstream
 huggingface_hub
+ffmpeg-python

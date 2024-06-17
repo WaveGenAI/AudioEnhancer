@@ -58,8 +58,6 @@ class Encodec(Codec):
             target_path (str): The file path to save the audio
         """
 
-        print(f"Encoding {audio_path} to {target_path} with Encodec")
-
         audio = self._load_audio(audio_path)
 
         with torch.no_grad():
