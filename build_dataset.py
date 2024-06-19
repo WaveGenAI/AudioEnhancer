@@ -33,6 +33,13 @@ parser.add_argument(
     required=False,
     help="The codecs to use, supported codecs: dac, encodec, soundstream, opus. Example: --codec dac encodec",
 )
+parser.add_argument(
+    "--split_audio",
+    type=bool,
+    default=False,
+    required=False,
+    help="Split the audio files into segments",
+)
 
 args = parser.parse_args()
 
@@ -50,4 +57,4 @@ for c in args.codec:
         raise ValueError(f"Unknown codec: {c}")
 
 builder = DatasetBuilder(codec)
-builder.build_ds(args.audio_dir, args.dataset_dir)
+builder.build_ds(args.audio_dir, args.dataset_dir, args.split_audio)
