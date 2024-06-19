@@ -18,15 +18,17 @@ def _cut_audio(row: dict) -> dict:
     Returns:
         dict: The row with the audio cut.
     """
-
+    
+    SAMPLE_RATE = row["clean"]['sampling_rate']
+    
     clean_audio = row["clean"]["array"]
-    clean_duration = int(clean_audio.shape[0] / row["clean"]['sampling_rate'])
+    clean_duration = int(clean_audio.shape[0] / SAMPLE_RATE)
 
     compressed_audio = row["compressed"]["array"]
-    compressed_duration = int(compressed_audio.shape[0] / row["compressed"]['sampling_rate'])
-
+    compressed_duration = int(compressed_audio.shape[0] / SAMPLE_RATE)
+    
     if clean_duration > compressed_duration:
-        row["clean"]["array"] = clean_audio[: compressed_duration * row["compressed"]['sampling_rate']]
+        row["clean"]["array"] = clean_audio[: compressed_duration * SAMPLE_RATE]
 
     return row
 
@@ -45,8 +47,8 @@ def load_data(path: str, sampling_rate: int = 16000) -> Dataset:
     dataset = load_dataset(path)
     dataset = dataset.shuffle(seed=42)
 
-    dataset = dataset.cast_column("clean", Audio(sampling_rate)).cast_column(
-        "compressed", Audio(sampling_rate)
+    dataset = dataset.cast_column("clean", Audio(sampling_rate=sampling_rate)).cast_column(
+        "compressed", Audio(sampling_rate=sampling_rate)
     )
 
     return dataset
@@ -62,6 +64,6 @@ def prepare_data(dataset: Dataset) -> Dataset:
         Dataset: The prepared dataset.
     """
 
-    dataset = dataset.map(_cut_audio)
+    dataset = dataset.map(_cut_audio, remove_columns=dataset.column_names)
 
     return dataset

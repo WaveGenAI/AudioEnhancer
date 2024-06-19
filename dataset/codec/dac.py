@@ -12,7 +12,7 @@ from dataset.codec.codec import Codec
 class DAC(Codec):
     """Class that encode the audio"""
 
-    def __init__(self, max_length: int = 30) -> None:
+    def __init__(self, max_length: int = 180) -> None:
         """Initialize the DAC codec
 
         Args:
