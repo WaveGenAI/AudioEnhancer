@@ -1,5 +1,4 @@
-from dataset.load_dataset import load_dataset
+from model.data import load_data, prepare_data
 
-dataset = load_dataset("/media/works/dataset/")                                                                        
-dataset = dataset.shuffle(seed=42)
-
+dataset = load_data("/media/works/dataset/")
+dataset = prepare_data(dataset)
