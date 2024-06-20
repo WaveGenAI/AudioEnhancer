@@ -57,9 +57,9 @@ class DatasetBuilder:
         for i in range(0, total_duration, max_duration_ms):
             segment = audio[i : i + max_duration_ms]
             
-            # don't save if shorter than 3 second
-            if len(segment) < 3000:
-                continue
+            # pad the segment if it is shorter than the max duration
+            if len(segment) < max_duration_ms:
+                segment = segment + AudioSegment.silent(duration=max_duration_ms - len(segment))
             
             segment_filename = (
                 f"{os.path.splitext(filename)[0]}_part{i // max_duration_ms + 1}.mp3"
