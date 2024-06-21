@@ -44,11 +44,7 @@ class Encoder(nn.Module):
 
         self.layers = nn.Sequential(
             CausalConv1d(in_channels=1, out_channels=C, kernel_size=7),
-            EncoderBlock(out_channels=2 * C, stride=strides[0]),
-            EncoderBlock(out_channels=4 * C, stride=strides[1]),
-            EncoderBlock(out_channels=8 * C, stride=strides[2]),
-            EncoderBlock(out_channels=16 * C, stride=strides[3]),
-            CausalConv1d(in_channels=16 * C, out_channels=D, kernel_size=3),
+        
         )
 
     def forward(self, x):

@@ -92,4 +92,8 @@ class SynthDataset(Dataset):
                 0,
             )
 
+        # keep 10 seconds of audio
+        base_waveform = base_waveform[:, :16000 * 10]
+        compressed_waveform = compressed_waveform[:, :16000 * 10]
+        
         return base_waveform, compressed_waveform

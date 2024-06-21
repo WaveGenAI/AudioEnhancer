@@ -5,22 +5,14 @@ Code for training.
 import auraloss
 import torch
 
-from constants import BATCH_SIZE, EPOCH
+from constants import BATCH_SIZE, EPOCH, SAMPLING_RATE
 from model.dataset import SynthDataset
 from model.soundstream import SoundStream
 
 # Load the dataset
 dataset = SynthDataset("/media/works/dataset/")
 
-loss_fn = auraloss.freq.MultiResolutionSTFTLoss(
-    fft_sizes=[1024, 2048, 8192],
-    hop_sizes=[256, 512, 2048],
-    win_lengths=[1024, 2048, 8192],
-    scale="mel",
-    n_bins=128,
-    sample_rate=16000,
-    perceptual_weighting=True,
-)
+loss_fn = auraloss.time.LogCoshLoss()
 
 # split test and train
 train_size = int(0.9 * len(dataset))
@@ -65,6 +57,9 @@ for epoch in range(EPOCH):
         print(
             f"EPOCH {epoch}, STEP {step}: Loss {loss.item()}, % of epoch {step / len(train_loader) * 100}"
         )
+        
+        if step % 100 == 0:
+            torch.save(model.state_dict(), "data/model.pth")
 
     model.eval()
     with torch.no_grad():
@@ -74,4 +69,3 @@ for epoch in range(EPOCH):
             loss = loss_fn(y, x)
             print("Test loss:", loss.item())
 
-torch.save(model.state_dict(), "data/model.pth")
