@@ -6,6 +6,8 @@ import torch
 import torchaudio
 
 from model.soundstream import SoundStream
+from constants import SAMPLING_RATE
+
 
 model = SoundStream(
     D=256,
@@ -18,7 +20,7 @@ model.load_state_dict(torch.load("data/model.pth"))
 
 def load(waveform_path):
     waveform, sample_rate = torchaudio.load(waveform_path)
-    resampler = torchaudio.transforms.Resample(sample_rate, 16000, dtype=waveform.dtype)
+    resampler = torchaudio.transforms.Resample(sample_rate, SAMPLING_RATE, dtype=waveform.dtype)
     waveform = resampler(waveform)
 
     waveform = waveform.mean(dim=0, keepdim=True)
@@ -29,4 +31,4 @@ def load(waveform_path):
 audio = load("data/test.mp3")
 output = model(audio)
 
-torchaudio.save("data/output.wav", output[0], 16000)
+torchaudio.save("data/output.wav", output[0], SAMPLING_RATE)
