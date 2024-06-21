@@ -1,15 +1,12 @@
 import auraloss
 import torch
 
-from model.dataset import NSynthDataset
+from constants import BATCH_SIZE, EPOCH
+from model.dataset import SynthDataset
 from model.soundstream import SoundStream
 
-BATCH_SIZE = 4
-EPOCH = 1
-
-
 # Load the dataset
-dataset = NSynthDataset("/media/works/data/")
+dataset = SynthDataset("/media/works/dataset/")
 
 loss_fn = auraloss.freq.MultiResolutionSTFTLoss(
     fft_sizes=[1024, 2048, 8192],
