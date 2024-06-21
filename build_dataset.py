@@ -35,10 +35,16 @@ parser.add_argument(
 )
 parser.add_argument(
     "--split_audio",
-    type=bool,
-    default=False,
-    required=False,
+    action="store_true",
     help="Split the audio files into segments",
+)
+
+parser.add_argument(
+    "--max_duration_ms",
+    type=int,
+    default=10000,
+    required=False,
+    help="The maximal duration in ms of the audio",
 )
 
 args = parser.parse_args()
@@ -57,4 +63,4 @@ for c in args.codec:
         raise ValueError(f"Unknown codec: {c}")
 
 builder = DatasetBuilder(codec)
-builder.build_ds(args.audio_dir, args.dataset_dir, args.split_audio)
+builder.build_ds(args.audio_dir, args.dataset_dir, args.split_audio, args.max_duration_ms)

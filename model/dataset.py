@@ -13,12 +13,13 @@ from torch.utils.data import Dataset
 class SynthDataset(Dataset):
     """Class to load the audio dataset."""
 
-    def __init__(self, audio_dir: str, pad_length: int = 16000 * 30):
+    def __init__(self, audio_dir: str, pad_length: int = 16000 * 10, mono: bool = True):
         """Initializes the dataset.
 
         Args:
             audio_dir (str): The path to the audio directory.
             pad_length (int): The length to pad the waveforms to.
+            mono (bool): Whether to load the audio as mono.
         """
 
         super().__init__()
@@ -35,6 +36,7 @@ class SynthDataset(Dataset):
 
         _, self.sr = torchaudio.load(self.filenames[0])
         self._pad_length = pad_length
+        self._mono = mono
 
     def __len__(self) -> int:
         """Returns the number of waveforms in the dataset.
@@ -73,8 +75,9 @@ class SynthDataset(Dataset):
         base_waveform = resampler(base_waveform)
         compressed_waveform = resampler(compressed_waveform)
 
-        base_waveform = base_waveform.mean(dim=0, keepdim=True)
-        compressed_waveform = compressed_waveform.mean(dim=0, keepdim=True)
+        if self._mono:
+            base_waveform = base_waveform.mean(dim=0, keepdim=True)
+            compressed_waveform = compressed_waveform.mean(dim=0, keepdim=True)
 
         if base_waveform.shape[-1] < self._pad_length:
             base_waveform = torch.nn.functional.pad(
@@ -91,9 +94,5 @@ class SynthDataset(Dataset):
                 "constant",
                 0,
             )
-
-        # keep 10 seconds of audio
-        base_waveform = base_waveform[:, :16000 * 10]
-        compressed_waveform = compressed_waveform[:, :16000 * 10]
         
         return base_waveform, compressed_waveform
