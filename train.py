@@ -1,3 +1,7 @@
+"""
+Code for training.
+"""
+
 import auraloss
 import torch
 
@@ -51,7 +55,7 @@ for epoch in range(EPOCH):
 
         optimizer.zero_grad()
 
-        x = batch.to(device)
+        x = batch[0].to(device)
         y = model(x)
 
         loss = loss_fn(y, x)
@@ -65,7 +69,7 @@ for epoch in range(EPOCH):
     model.eval()
     with torch.no_grad():
         for batch in test_loader:
-            x = batch.to(device)
+            x = batch[0].to(device)
             y = model(x)
             loss = loss_fn(y, x)
             print("Test loss:", loss.item())

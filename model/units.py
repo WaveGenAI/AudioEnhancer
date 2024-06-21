@@ -1,3 +1,7 @@
+"""
+Specific units used in the model.
+"""
+
 import torch.nn as nn
 import torch.nn.functional as F
 

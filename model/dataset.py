@@ -1,3 +1,7 @@
+"""
+Module to load the audio dataset.
+"""
+
 import glob
 import os
 

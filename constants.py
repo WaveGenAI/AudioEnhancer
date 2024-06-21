@@ -1,3 +1,7 @@
+"""
+Constants for the project.
+"""
+
 SAMPLING_RATE = 16000
 MAX_AUDIO_LENGTH = 30
 BATCH_SIZE = 1

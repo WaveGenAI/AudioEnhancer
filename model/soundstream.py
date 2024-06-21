@@ -1,3 +1,8 @@
+""" 
+Module to build the model
+Note: All the code come from https://github.com/haydenshively/SoundStream/tree/master
+"""
+
 from functools import reduce
 
 import torch.nn as nn
@@ -21,7 +26,8 @@ class SoundStream(nn.Module):
         # x: batch_size x 1 x (T / 1)
         # e: batch_size x (T / M) x D --- where M is product of all numbers in `strides` tuple
         # o: batch_size x 1 x (T / 1)
-
+    
         e = self.encoder(x)
         o = self.decoder(e)
+
         return o

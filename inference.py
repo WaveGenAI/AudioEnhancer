@@ -1,3 +1,7 @@
+"""
+Code for inference.
+"""
+
 import torch
 import torchaudio
 
