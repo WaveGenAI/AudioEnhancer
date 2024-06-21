@@ -9,11 +9,13 @@ import torch
 import torchaudio
 from torch.utils.data import Dataset
 
+from constants import SAMPLING_RATE
+
 
 class SynthDataset(Dataset):
     """Class to load the audio dataset."""
 
-    def __init__(self, audio_dir: str, pad_length: int = 16000 * 10, mono: bool = True):
+    def __init__(self, audio_dir: str, pad_length: int = SAMPLING_RATE * 10, mono: bool = True):
         """Initializes the dataset.
 
         Args:
@@ -69,7 +71,7 @@ class SynthDataset(Dataset):
         compressed_waveform, _ = torchaudio.load(compressed_file)
 
         resampler = torchaudio.transforms.Resample(
-            sample_rate, 16000, dtype=base_waveform.dtype
+            sample_rate, SAMPLING_RATE, dtype=base_waveform.dtype
         )
 
         base_waveform = resampler(base_waveform)
@@ -78,7 +80,12 @@ class SynthDataset(Dataset):
         if self._mono:
             base_waveform = base_waveform.mean(dim=0, keepdim=True)
             compressed_waveform = compressed_waveform.mean(dim=0, keepdim=True)
-
+        else:
+            if base_waveform.shape[0] == 1:
+                base_waveform = base_waveform.repeat(2, 1)
+            if compressed_waveform.shape[0] == 1:
+                compressed_waveform = compressed_waveform.repeat(2, 1)
+            
         if base_waveform.shape[-1] < self._pad_length:
             base_waveform = torch.nn.functional.pad(
                 base_waveform,
@@ -94,5 +101,5 @@ class SynthDataset(Dataset):
                 "constant",
                 0,
             )
-        
-        return base_waveform, compressed_waveform
+
+        return compressed_waveform, base_waveform

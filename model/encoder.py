@@ -3,7 +3,7 @@ Encoder block
 """
 
 import torch.nn as nn
-from soundstream.units import CausalConv1d, ResidualUnit
+from model.units import CausalConv1d, ResidualUnit
 
 
 class EncoderBlock(nn.Module):
@@ -43,8 +43,7 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
 
         self.layers = nn.Sequential(
-            CausalConv1d(in_channels=1, out_channels=C, kernel_size=7),
-        
+            CausalConv1d(in_channels=2, out_channels=C, kernel_size=7),
         )
 
     def forward(self, x):

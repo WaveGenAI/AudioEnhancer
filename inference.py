@@ -23,12 +23,9 @@ def load(waveform_path):
     resampler = torchaudio.transforms.Resample(sample_rate, SAMPLING_RATE, dtype=waveform.dtype)
     waveform = resampler(waveform)
 
-    waveform = waveform.mean(dim=0, keepdim=True)
-
-    return torch.unsqueeze(waveform, dim=0)
-
+    return waveform
 
 audio = load("data/test.mp3")
 output = model(audio)
 
-torchaudio.save("data/output.wav", output[0], SAMPLING_RATE)
+torchaudio.save("data/output.wav", output, SAMPLING_RATE)

@@ -11,7 +11,7 @@ from model.dataset import SynthDataset
 from model.soundstream import SoundStream
 
 # Load the dataset
-dataset = SynthDataset("/media/works/dataset/")
+dataset = SynthDataset("/media/works/dataset/", mono=False)
 
 loss_fn = auraloss.time.LogCoshLoss()
 
@@ -52,9 +52,11 @@ for epoch in range(EPOCH):
         optimizer.zero_grad()
 
         x = batch[0].to(device)
-        y = model(x)
+        y = batch[1].to(device)
+        
+        y_hat = model(y)
 
-        loss = loss_fn(y, x)
+        loss = loss_fn(y_hat, y)
         loss.backward()
         optimizer.step()
 
