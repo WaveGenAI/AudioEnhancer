@@ -3,7 +3,7 @@ Encoder block
 """
 
 import torch.nn as nn
-from model.units import CausalConv1d, ResidualUnit
+from model.units import ResidualUnit, CausalConv1d
 
 
 class EncoderBlock(nn.Module):
@@ -43,7 +43,12 @@ class Encoder(nn.Module):
         super(Encoder, self).__init__()
 
         self.layers = nn.Sequential(
-            CausalConv1d(in_channels=2, out_channels=C, kernel_size=7),
+            nn.Conv1d(in_channels=2, out_channels=C, kernel_size=7, padding="same", padding_mode="reflect"),
+            EncoderBlock(out_channels=2 * C, stride=strides[0]),
+            EncoderBlock(out_channels=4 * C, stride=strides[1]),
+            EncoderBlock(out_channels=8 * C, stride=strides[2]),
+            EncoderBlock(out_channels=16 * C, stride=strides[3]),
+            nn.Conv1d(in_channels=16 * C, out_channels=D, kernel_size=3, padding="same", padding_mode="reflect"),
         )
 
     def forward(self, x):

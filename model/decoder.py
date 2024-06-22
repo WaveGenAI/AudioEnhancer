@@ -1,9 +1,5 @@
-""" 
-Decoder block
-"""
-
 import torch.nn as nn
-from model.units import CausalConv1d, CausalConvTranspose1d, ResidualUnit
+from soundstream.units import CausalConvTranspose1d, ResidualUnit
 
 
 class DecoderBlock(nn.Module):
@@ -37,8 +33,24 @@ class Decoder(nn.Module):
         super(Decoder, self).__init__()
 
         self.layers = nn.Sequential(
-
-            CausalConv1d(in_channels=C, out_channels=2, kernel_size=7),
+            nn.Conv1d(
+                in_channels=D,
+                out_channels=16 * C,
+                kernel_size=7,
+                padding="same",
+                padding_mode="reflect",
+            ),
+            DecoderBlock(out_channels=8 * C, stride=strides[3]),
+            DecoderBlock(out_channels=4 * C, stride=strides[2]),
+            DecoderBlock(out_channels=2 * C, stride=strides[1]),
+            DecoderBlock(out_channels=C, stride=strides[0]),
+            nn.Conv1d(
+                in_channels=C,
+                out_channels=2,
+                kernel_size=7,
+                padding="same",
+                padding_mode="reflect",
+            ),
         )
 
     def forward(self, x):
