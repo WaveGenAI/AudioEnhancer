@@ -9,7 +9,7 @@ import torch.nn as nn
 
 from model.decoder import Decoder
 from model.encoder import Encoder
-
+from model.latent import Latent
 
 class SoundStream(nn.Module):
     def __init__(self, D, C, strides=(2, 4, 5, 8)):
@@ -21,6 +21,7 @@ class SoundStream(nn.Module):
 
         self.encoder = Encoder(C=C, D=D, strides=strides)
         self.decoder = Decoder(C=C, D=D, strides=strides)
+        self.latent = Latent()
 
     def forward(self, x):
         # x: batch_size x 1 x (T / 1)
@@ -28,6 +29,7 @@ class SoundStream(nn.Module):
         # o: batch_size x 1 x (T / 1)
         
         e = self.encoder(x)
-        o = self.decoder(e)
+        l = self.latent(e)
+        o = self.decoder(l)
 
         return o

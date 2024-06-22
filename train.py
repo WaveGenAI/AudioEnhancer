@@ -6,14 +6,14 @@ import auraloss
 import torch
 from torch.optim import lr_scheduler
 
-from constants import BATCH_SIZE, EPOCH, SAMPLING_RATE
+from constants import BATCH_SIZE, EPOCH
 from model.dataset import SynthDataset
 from model.soundstream import SoundStream
 
 # Load the dataset
 dataset = SynthDataset("/media/works/dataset/", mono=False)
 
-loss_fn = [auraloss.time.LogCoshLoss(), auraloss.freq.STFTLoss()]
+loss_fn = [auraloss.time.LogCoshLoss()]
 
 # split test and train
 train_size = int(0.9 * len(dataset))

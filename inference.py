@@ -24,10 +24,15 @@ def load(waveform_path):
     waveform = resampler(waveform)
     if waveform.shape[0] == 1:
         waveform = waveform.repeat(2, 1)
-    return waveform
+    
+    # add a batch dimension
+    waveform = waveform.unsqueeze(0)
+    
+    return waveform[:,:, :SAMPLING_RATE*10]
 
-audio = load("/media/works/dataset/soundstream/12100_part13.mp3")
+audio = load("data/test.mp3")
 
 output = model(audio)
+output = output.squeeze(0)
 
-# torchaudio.save("data/output.wav", output, SAMPLING_RATE)
+torchaudio.save("data/output.wav", output, SAMPLING_RATE)
