@@ -15,7 +15,7 @@ model = SoundStream(
     strides=(2, 4, 5, 5),
 )
 
-# model.load_state_dict(torch.load("data/model.pth"))
+model.load_state_dict(torch.load("data/model.pth"))
 
 
 def load(waveform_path):
@@ -24,8 +24,7 @@ def load(waveform_path):
     waveform = resampler(waveform)
     if waveform.shape[0] == 1:
         waveform = waveform.repeat(2, 1)
-    
-    # add a batch dimension
+  
     waveform = waveform.unsqueeze(0)
     
     return waveform[:,:, :SAMPLING_RATE*10]
