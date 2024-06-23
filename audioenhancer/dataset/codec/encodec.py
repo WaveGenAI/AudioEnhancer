@@ -7,7 +7,7 @@ import torchaudio
 from encodec import EncodecModel
 from encodec.utils import convert_audio, save_audio
 
-from dataset.codec.codec import Codec
+from audioenhancer.dataset.codec.codec import Codec
 
 
 class Encodec(Codec):

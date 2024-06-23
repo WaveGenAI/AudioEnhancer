@@ -7,7 +7,7 @@ import argparse
 import torch
 import torchaudio
 
-import scripts.setup_paths
+import setup_paths
 from audioenhancer.constants import SAMPLING_RATE
 from audioenhancer.model.soundstream import SoundStream
 

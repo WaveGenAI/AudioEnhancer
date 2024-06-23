@@ -6,7 +6,7 @@ import dac
 import torch
 from audiotools import AudioSignal
 
-from dataset.codec.codec import Codec
+from audioenhancer.dataset.codec.codec import Codec
 
 
 class DAC(Codec):

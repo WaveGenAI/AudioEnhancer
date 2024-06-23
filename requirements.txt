@@ -9,3 +9,4 @@ ffmpeg-python
 descript-audio-codec
 datasets
 auraloss
+pydub

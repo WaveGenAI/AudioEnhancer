@@ -10,7 +10,7 @@ from typing import List
 import tqdm
 from pydub import AudioSegment
 
-from dataset.codec import Codec
+from audioenhancer.dataset.codec import Codec
 
 
 class DatasetBuilder:
@@ -36,7 +36,13 @@ class DatasetBuilder:
             if not os.path.exists(os.path.join(dir_path, str(used_codec))):
                 os.makedirs(os.path.join(dir_path, str(used_codec)))
 
-    def process_file(self, audio_dir: str, filename: str, target_dir: str, max_duration_ms: int = 10000):
+    def process_file(
+        self,
+        audio_dir: str,
+        filename: str,
+        target_dir: str,
+        max_duration_ms: int = 10000,
+    ):
         """Process a file by splitting it into segments.
 
         Args:
@@ -51,25 +57,29 @@ class DatasetBuilder:
 
         self._nbm_files_processed += 1
         print(f"Process {self._nbm_files_processed} files", end="\r")
-        
-        if total_duration <= (max_duration_ms+0.2):
+
+        if total_duration <= (max_duration_ms + 0.2):
             return
 
         for i in range(0, total_duration, max_duration_ms):
             segment = audio[i : i + max_duration_ms]
-            
+
             # pad the segment if it is shorter than the max duration
             if len(segment) < max_duration_ms:
-                segment = segment + AudioSegment.silent(duration=max_duration_ms - len(segment))
-            
+                segment = segment + AudioSegment.silent(
+                    duration=max_duration_ms - len(segment)
+                )
+
             segment_filename = (
                 f"{os.path.splitext(filename)[0]}_part{i // max_duration_ms + 1}.mp3"
             )
             output_path = os.path.join(target_dir, segment_filename)
-         
+
             segment.export(output_path, format="mp3")
 
-    def process_audio_files(self, audio_dir: str, target_dir: str, max_duration_ms: int = 10000):
+    def process_audio_files(
+        self, audio_dir: str, target_dir: str, max_duration_ms: int = 10000
+    ):
         """
         Process audio files by splitting them into segments.
 
@@ -83,7 +93,9 @@ class DatasetBuilder:
 
         with ThreadPoolExecutor() as executor:
             futures = [
-                executor.submit(self.process_file, audio_dir, filename, target_dir, max_duration_ms)
+                executor.submit(
+                    self.process_file, audio_dir, filename, target_dir, max_duration_ms
+                )
                 for filename in filename_list
             ]
             for future in futures:
@@ -91,7 +103,13 @@ class DatasetBuilder:
 
         print("All files processed")
 
-    def build_ds(self, audio_dir: str, dataset_dir: str, split_audio: bool = False, max_duration_ms: int = 10000):
+    def build_ds(
+        self,
+        audio_dir: str,
+        dataset_dir: str,
+        split_audio: bool = False,
+        max_duration_ms: int = 10000,
+    ):
         """Build the dataset by converting audio files to low quality audio.
 
         Args:
@@ -104,7 +122,7 @@ class DatasetBuilder:
         print("Building the dataset...")
 
         self.create_dir(dataset_dir)
-        
+
         if split_audio:
             self.process_audio_files(audio_dir, dataset_dir, max_duration_ms)
 
@@ -118,10 +136,10 @@ class DatasetBuilder:
             for files in os.listdir(dataset_dir):
                 if not files.endswith(".mp3"):
                     continue
-                
+
                 file_path = os.path.join(dataset_dir, files)
                 target_path = os.path.join(dataset_dir, str(used_codec), files)
-                
+
                 used_codec.encoder_decoder(file_path, target_path)
 
                 progress_bar.update(1)

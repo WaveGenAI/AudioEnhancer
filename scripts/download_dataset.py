@@ -6,7 +6,7 @@ The codec is used to encode the audio files.
 
 import argparse
 
-import scripts.setup_paths
+import setup_paths
 from audioenhancer.dataset.download import download
 
 parser = argparse.ArgumentParser()

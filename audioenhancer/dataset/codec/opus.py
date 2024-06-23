@@ -6,7 +6,7 @@ import tempfile
 
 import ffmpeg
 
-from dataset.codec.codec import Codec
+from audioenhancer.dataset.codec.codec import Codec
 
 
 class Opus(Codec):

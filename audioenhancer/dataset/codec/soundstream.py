@@ -6,7 +6,7 @@ import torch
 import torchaudio
 from soundstream import from_pretrained, load
 
-from dataset.codec.codec import Codec
+from audioenhancer.dataset.codec.codec import Codec
 
 
 class Soundstream(Codec):

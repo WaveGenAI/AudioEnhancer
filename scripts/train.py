@@ -7,13 +7,13 @@ import torch
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 
-import scripts.setup_paths
+import setup_paths
 from audioenhancer.constants import BATCH_SIZE, EPOCH
 from audioenhancer.dataset.loader import SynthDataset
 from audioenhancer.model.soundstream import SoundStream
 
 # Load the dataset
-dataset = SynthDataset("/media/works/dataset/", mono=False)
+dataset = SynthDataset(r"C:\Users\jourd\Desktop\dev\dataset\dataset", mono=False)
 writer = SummaryWriter()
 
 loss_fn = [auraloss.time.LogCoshLoss()]
