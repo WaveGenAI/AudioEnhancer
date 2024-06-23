@@ -7,6 +7,7 @@ import torch
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 
+import scripts.setup_paths
 from audioenhancer.constants import BATCH_SIZE, EPOCH
 from audioenhancer.dataset.loader import SynthDataset
 from audioenhancer.model.soundstream import SoundStream
@@ -61,7 +62,7 @@ for epoch in range(EPOCH):
 
         loss = sum([loss(y_hat, y) for loss in loss_fn])
         writer.add_scalar("Loss/train", loss.item(), step)
-        
+
         loss.backward()
 
         optimizer.step()

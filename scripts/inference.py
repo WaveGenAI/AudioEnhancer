@@ -7,6 +7,7 @@ import argparse
 import torch
 import torchaudio
 
+import scripts.setup_paths
 from audioenhancer.constants import SAMPLING_RATE
 from audioenhancer.model.soundstream import SoundStream
 
@@ -31,14 +32,17 @@ model.load_state_dict(torch.load("data/model.pth"))
 
 def load(waveform_path):
     waveform, sample_rate = torchaudio.load(waveform_path)
-    resampler = torchaudio.transforms.Resample(sample_rate, SAMPLING_RATE, dtype=waveform.dtype)
+    resampler = torchaudio.transforms.Resample(
+        sample_rate, SAMPLING_RATE, dtype=waveform.dtype
+    )
     waveform = resampler(waveform)
     if waveform.shape[0] == 1:
         waveform = waveform.repeat(2, 1)
-  
+
     waveform = waveform.unsqueeze(0)
-    
-    return waveform[:,:, :SAMPLING_RATE*10]
+
+    return waveform[:, :, : SAMPLING_RATE * 10]
+
 
 audio = load(args.audio)
 

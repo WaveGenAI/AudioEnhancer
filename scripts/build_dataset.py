@@ -6,6 +6,7 @@ The codec is used to encode the audio files.
 
 import argparse
 
+import scripts.setup_paths
 from audioenhancer.dataset.build import DatasetBuilder
 from audioenhancer.dataset.codec import DAC, Encodec, Opus, Soundstream
 
@@ -63,4 +64,6 @@ for c in args.codec:
         raise ValueError(f"Unknown codec: {c}")
 
 builder = DatasetBuilder(codec)
-builder.build_ds(args.audio_dir, args.dataset_dir, args.split_audio, args.max_duration_ms)
+builder.build_ds(
+    args.audio_dir, args.dataset_dir, args.split_audio, args.max_duration_ms
+)
