@@ -9,7 +9,7 @@ import torch
 import torchaudio
 from torch.utils.data import Dataset
 
-from constants import SAMPLING_RATE
+from audioenhancer.constants import SAMPLING_RATE
 
 
 class SynthDataset(Dataset):

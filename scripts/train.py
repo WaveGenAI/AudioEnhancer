@@ -7,9 +7,9 @@ import torch
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 
-from constants import BATCH_SIZE, EPOCH
-from model.dataset import SynthDataset
-from model.soundstream import SoundStream
+from audioenhancer.constants import BATCH_SIZE, EPOCH
+from audioenhancer.dataset.loader import SynthDataset
+from audioenhancer.model.soundstream import SoundStream
 
 # Load the dataset
 dataset = SynthDataset("/media/works/dataset/", mono=False)

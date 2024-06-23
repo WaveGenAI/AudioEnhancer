@@ -12,11 +12,17 @@ pip install -r requirements.txt
 
 To download the dataset, run the following command:
 ```bash
-python download_dataset.py --audio_dir PATH --quantity 1
+python scripts/download_dataset.py --audio_dir PATH --quantity 1
 ```
 
 ## Build the dataset
 To build the dataset, run the following command:
 ```bash
-python build_dataset.py --audio_dir PATH --dataset_dir PATH --codec dac encodec soundstream opus
+python scripts/build_dataset.py --audio_dir PATH --dataset_dir PATH --codec dac encodec soundstream opus
+```
+
+## Train the model
+To train the model, run the following command:
+``` 
+python train.py
 ```
