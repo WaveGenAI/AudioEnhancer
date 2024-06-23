@@ -163,3 +163,5 @@ test.py
 
 data/model.pth
 data/output.wav
+
+runs/

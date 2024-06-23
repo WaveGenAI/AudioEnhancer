@@ -5,6 +5,7 @@ Code for training.
 import auraloss
 import torch
 from torch.optim import lr_scheduler
+from torch.utils.tensorboard import SummaryWriter
 
 from constants import BATCH_SIZE, EPOCH
 from model.dataset import SynthDataset
@@ -12,6 +13,7 @@ from model.soundstream import SoundStream
 
 # Load the dataset
 dataset = SynthDataset("/media/works/dataset/", mono=False)
+writer = SummaryWriter()
 
 loss_fn = [auraloss.time.LogCoshLoss()]
 
@@ -58,6 +60,8 @@ for epoch in range(EPOCH):
         y_hat = model(y)
 
         loss = sum([loss(y_hat, y) for loss in loss_fn])
+        writer.add_scalar("Loss/train", loss.item(), step)
+        
         loss.backward()
 
         optimizer.step()
@@ -83,3 +87,6 @@ for epoch in range(EPOCH):
             print("Test loss:", loss.item())
 
     step = 0
+
+writer.flush()
+writer.close()
