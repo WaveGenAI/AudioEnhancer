@@ -3,22 +3,27 @@ Code for training.
 """
 
 import argparse
+import os
+from pathlib import Path
 
 import auraloss
-import setup_paths
 import torch
+from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 
-from audioenhancer.constants import BATCH_SIZE, EPOCH
+from audioenhancer.constants import BATCH_SIZE, EPOCH, MAX_AUDIO_LENGTH, LOGGING_STEPS, GRADIENT_ACCUMULATION_STEPS, \
+    SAVE_STEPS
 from audioenhancer.dataset.loader import SynthDataset
 from audioenhancer.model.soundstream import SoundStream
+import bitsandbytes as bnb
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--dataset_dir",
     type=str,
-    required=True,
+    default="../media/works/dataset",
+    required=False,
     help="The directory containing the dataset",
 )
 
@@ -40,7 +45,7 @@ args = parser.parse_args()
 
 
 # Load the dataset
-dataset = SynthDataset(args.dataset_dir, mono=args.mono)
+dataset = SynthDataset(args.dataset_dir, max_duration=MAX_AUDIO_LENGTH, mono=args.mono)
 writer = SummaryWriter()
 
 loss_fn = [auraloss.time.LogCoshLoss()]
@@ -60,27 +65,33 @@ test_loader = torch.utils.data.DataLoader(
 )
 
 model = SoundStream(
-    D=256,
-    C=58,
-    strides=(2, 4, 5, 5),
+    D=512,
+    C=64,
+    strides=(2, 4, 4, 5),
 )
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device {device}")
 model.to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+optimizer = bnb.optim.AdamW8bit(model.parameters(), lr=5e-4)
 scheduler = lr_scheduler.LinearLR(
-    optimizer, start_factor=1.0, end_factor=0.5, total_iters=30
+    optimizer,
+    start_factor=1,
+    end_factor=1e-6,
+    total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE)
 )
 
+# print number of parameters
+
+print(f"Number of parameters: {sum(p.numel() for p in model.parameters())/1e6}M")
+
 step = 0
+logging_loss = 0
 for epoch in range(EPOCH):
     model.train()
     for batch in train_loader:
         step += 1
-
-        optimizer.zero_grad()
 
         x = batch[0].to(device)
         y = batch[1].to(device)
@@ -88,20 +99,37 @@ for epoch in range(EPOCH):
         y_hat = model(y)
 
         loss = sum([loss(y_hat, y) for loss in loss_fn])
-        writer.add_scalar("Loss/train", loss.item(), step)
-
+        logging_loss += loss.detach().cpu().numpy()
         loss.backward()
+        if (step % LOGGING_STEPS) == 0:
+            writer.add_scalar("Loss", logging_loss/LOGGING_STEPS, step)
+            writer.add_scalar("LR", scheduler.get_last_lr()[0], step)
+            print(
+                f"EPOCH {epoch} ({round((step % len(train_loader)) / len(train_loader) * 100, 3)}%) - "
+                f"STEP {step}:"
+                f" Loss {round(logging_loss/LOGGING_STEPS, 4)}"
+                f" LR {round(scheduler.get_last_lr()[0], 7)}"
+            )
+            logging_loss = 0
 
-        optimizer.step()
+        if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 2)
 
-        print(
-            f"EPOCH {epoch} ({round((step%len(train_loader)) / len(train_loader) * 100, 3)}%) - STEP {step}: Loss {round(loss.item(), 3)}"
-        )
+            for name, param in model.named_parameters():
+                if param.grad is not None:
+                    param.grad /= GRADIENT_ACCUMULATION_STEPS
 
-        if step % 100 == 0:
+            optimizer.step()
+            optimizer.zero_grad()
+            scheduler.step()
+
+
+
+        if step % SAVE_STEPS == 0:
+            if not os.path.exists(args.model_path):
+                Path(args.model_path).parent.mkdir(parents=True, exist_ok=True)
+
             torch.save(model.state_dict(), args.model_path)
-
-    scheduler.step()
 
     model.eval()
 

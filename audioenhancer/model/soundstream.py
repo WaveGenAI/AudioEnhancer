@@ -22,7 +22,7 @@ class SoundStream(nn.Module):
 
         self.encoder = Encoder(C=C, D=D, strides=strides)
         self.decoder = Decoder(C=C, D=D, strides=strides)
-        self.latent = Latent()
+        # self.latent = Latent(D=D)
 
     def forward(self, x):
         # x: batch_size x 1 x (T / 1)
@@ -30,7 +30,7 @@ class SoundStream(nn.Module):
         # o: batch_size x 1 x (T / 1)
 
         e = self.encoder(x)
-        l = self.latent(e)
-        o = self.decoder(l)
+        # l = self.latent(e)
+        o = self.decoder(e)
 
         return o

@@ -14,17 +14,18 @@ from audioenhancer.model.soundstream import SoundStream
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--audio",
+    default="../data/test.mp3",
     type=str,
-    required=True,
+    required=False,
     help="The path to the audio file to enhance",
 )
 
 args = parser.parse_args()
 
 model = SoundStream(
-    D=256,
-    C=58,
-    strides=(2, 4, 5, 5),
+    D=512,
+    C=64,
+    strides=(2, 4, 4, 5),
 )
 
 model.load_state_dict(torch.load("data/model.pth"))
@@ -50,6 +51,8 @@ output = model(audio)
 output = output.squeeze(0)
 
 # fix runtime error: numpy
-output = output.detach().numpy()
+output = output.detach()
+audio = audio.squeeze(0)
 
-torchaudio.save("data/output.mp3", output.T, SAMPLING_RATE, channels_first=False)
+torchaudio.save("../data/input.mp3", audio.T, SAMPLING_RATE, channels_first=False)
+torchaudio.save("../data/output.mp3", output.T, SAMPLING_RATE, channels_first=False)

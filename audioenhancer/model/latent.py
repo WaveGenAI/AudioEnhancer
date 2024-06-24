@@ -7,11 +7,11 @@ import torch.nn as nn
 
 
 class Latent(nn.Module):
-    def __init__(self):
+    def __init__(self, D: int = 256):
         super(Latent, self).__init__()
 
         encoder_layer = nn.TransformerEncoderLayer(
-            d_model=256, nhead=16, dim_feedforward=1024
+            d_model=D, nhead=16, dim_feedforward=1024
         )
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=4)
 

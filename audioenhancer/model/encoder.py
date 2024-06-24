@@ -25,7 +25,7 @@ class EncoderBlock(nn.Module):
             ResidualUnit(
                 in_channels=out_channels // 2,
                 out_channels=out_channels // 2,
-                dilation=9,
+                dilation=3,
             ),
             CausalConv1d(
                 in_channels=out_channels // 2,

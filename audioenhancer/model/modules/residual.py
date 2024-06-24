@@ -20,7 +20,7 @@ class ResidualUnit(nn.Module):
                 padding=dilation * 3,
                 padding_mode=pad_mode,
             ),
-            nn.ELU(),
+            nn.ReLU(),
             nn.Conv1d(
                 in_channels=in_channels,
                 out_channels=out_channels,

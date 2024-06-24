@@ -18,10 +18,10 @@ class DecoderBlock(nn.Module):
                 in_channels=out_channels, out_channels=out_channels, dilation=1
             ),
             ResidualUnit(
-                in_channels=out_channels, out_channels=out_channels, dilation=3
+                in_channels=out_channels, out_channels=out_channels, dilation=2
             ),
             ResidualUnit(
-                in_channels=out_channels, out_channels=out_channels, dilation=9
+                in_channels=out_channels, out_channels=out_channels, dilation=3
             ),
         )
 

@@ -16,13 +16,13 @@ class SynthDataset(Dataset):
     """Class to load the audio dataset."""
 
     def __init__(
-        self, audio_dir: str, pad_length: int = SAMPLING_RATE * 10, mono: bool = True
+        self, audio_dir: str, max_duration: int = 10, mono: bool = True
     ):
         """Initializes the dataset.
 
         Args:
             audio_dir (str): The path to the audio directory.
-            pad_length (int): The length to pad the waveforms to.
+            max_duration (int): The max duration of the audio in seconds.
             mono (bool): Whether to load the audio as mono.
         """
 
@@ -38,8 +38,7 @@ class SynthDataset(Dataset):
             if os.path.isdir(f)
         ]
 
-        _, self.sr = torchaudio.load(self.filenames[0])
-        self._pad_length = pad_length
+        self._pad_length = max_duration * SAMPLING_RATE
         self._mono = mono
 
     def __len__(self) -> int:
@@ -70,14 +69,16 @@ class SynthDataset(Dataset):
         compressed_file = os.path.join(codec, os.path.basename(base_file))
 
         base_waveform, sample_rate = torchaudio.load(base_file)
-        compressed_waveform, _ = torchaudio.load(compressed_file)
+        compressed_waveform, compress_sr = torchaudio.load(compressed_file)
 
-        resampler = torchaudio.transforms.Resample(
+        base_waveform = torchaudio.transforms.Resample(
             sample_rate, SAMPLING_RATE, dtype=base_waveform.dtype
-        )
+        )(base_waveform)
 
-        base_waveform = resampler(base_waveform)
-        compressed_waveform = resampler(compressed_waveform)
+        compressed_waveform = torchaudio.transforms.Resample(
+            compress_sr, SAMPLING_RATE, dtype=compressed_waveform.dtype
+        )(compressed_waveform)
+
 
         if self._mono:
             base_waveform = base_waveform.mean(dim=0, keepdim=True)
@@ -95,6 +96,8 @@ class SynthDataset(Dataset):
                 "constant",
                 0,
             )
+        else:
+            base_waveform = base_waveform[:, : self._pad_length]
 
         if compressed_waveform.shape[-1] < self._pad_length:
             compressed_waveform = torch.nn.functional.pad(
@@ -103,5 +106,6 @@ class SynthDataset(Dataset):
                 "constant",
                 0,
             )
-
+        else:
+            compressed_waveform = compressed_waveform[:, : self._pad_length]
         return compressed_waveform, base_waveform
