@@ -2,18 +2,45 @@
 Code for training.
 """
 
+import argparse
+
 import auraloss
+import setup_paths
 import torch
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 
-import setup_paths
 from audioenhancer.constants import BATCH_SIZE, EPOCH
 from audioenhancer.dataset.loader import SynthDataset
 from audioenhancer.model.soundstream import SoundStream
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+    "--dataset_dir",
+    type=str,
+    required=True,
+    help="The directory containing the dataset",
+)
+
+parser.add_argument(
+    "--model_path",
+    type=str,
+    required=False,
+    default="data/model.pth",
+    help="The path to save the model",
+)
+
+parser.add_argument(
+    "--mono",
+    action="store_true",
+    help="Use mono audio",
+)
+
+args = parser.parse_args()
+
+
 # Load the dataset
-dataset = SynthDataset(r"C:\Users\jourd\Desktop\dev\dataset\dataset", mono=False)
+dataset = SynthDataset(args.dataset_dir, mono=args.mono)
 writer = SummaryWriter()
 
 loss_fn = [auraloss.time.LogCoshLoss()]
@@ -34,7 +61,7 @@ test_loader = torch.utils.data.DataLoader(
 
 model = SoundStream(
     D=256,
-    C=58,
+    C=1,
     strides=(2, 4, 5, 5),
 )
 
@@ -68,15 +95,17 @@ for epoch in range(EPOCH):
         optimizer.step()
 
         print(
-            f"EPOCH {epoch} ({round(step / len(train_loader) * 100, 3)}%) - STEP {step}: Loss {round(loss.item(), 3)}"
+            f"EPOCH {epoch} ({round((step%len(train_loader)) / len(train_loader) * 100, 3)}%) - STEP {step}: Loss {round(loss.item(), 3)}"
         )
 
         if step % 100 == 0:
-            torch.save(model.state_dict(), "data/model.pth")
+            torch.save(model.state_dict(), args.model_path)
 
     scheduler.step()
 
     model.eval()
+
+    loss_test = 0
     with torch.no_grad():
         for batch in test_loader:
             x = batch[0].to(device)
@@ -85,9 +114,11 @@ for epoch in range(EPOCH):
             y_hat = model(y)
             loss = sum([loss(y_hat, y) for loss in loss_fn])
 
-            print("Test loss:", loss.item())
+            loss_test += loss.item()
 
-    step = 0
+    print(f"Avg test Loss: {loss_test / len(test_loader)}")
+
+torch.save(model.state_dict(), args.model_path)
 
 writer.flush()
 writer.close()

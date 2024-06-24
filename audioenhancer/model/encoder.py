@@ -3,7 +3,8 @@ Encoder block
 """
 
 import torch.nn as nn
-from audioenhancer.model.units import ResidualUnit, CausalConv1d
+
+from audioenhancer.model.modules import CausalConv1d, ResidualUnit
 
 
 class EncoderBlock(nn.Module):

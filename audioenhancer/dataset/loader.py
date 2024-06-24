@@ -15,7 +15,9 @@ from audioenhancer.constants import SAMPLING_RATE
 class SynthDataset(Dataset):
     """Class to load the audio dataset."""
 
-    def __init__(self, audio_dir: str, pad_length: int = SAMPLING_RATE * 10, mono: bool = True):
+    def __init__(
+        self, audio_dir: str, pad_length: int = SAMPLING_RATE * 10, mono: bool = True
+    ):
         """Initializes the dataset.
 
         Args:
@@ -85,7 +87,7 @@ class SynthDataset(Dataset):
                 base_waveform = base_waveform.repeat(2, 1)
             if compressed_waveform.shape[0] == 1:
                 compressed_waveform = compressed_waveform.repeat(2, 1)
-            
+
         if base_waveform.shape[-1] < self._pad_length:
             base_waveform = torch.nn.functional.pad(
                 base_waveform,

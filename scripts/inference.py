@@ -23,7 +23,7 @@ args = parser.parse_args()
 
 model = SoundStream(
     D=256,
-    C=58,
+    C=1,
     strides=(2, 4, 5, 5),
 )
 
@@ -49,4 +49,7 @@ audio = load(args.audio)
 output = model(audio)
 output = output.squeeze(0)
 
-torchaudio.save("data/output.wav", output, SAMPLING_RATE)
+# fix runtime error: numpy
+output = output.detach().numpy()
+
+torchaudio.save("data/output.mp3", output.T, SAMPLING_RATE, channels_first=False)

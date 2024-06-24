@@ -1,5 +1,6 @@
 import torch.nn as nn
-from soundstream.units import CausalConvTranspose1d, ResidualUnit
+
+from audioenhancer.model.modules import CausalConvTranspose1d, ResidualUnit
 
 
 class DecoderBlock(nn.Module):
