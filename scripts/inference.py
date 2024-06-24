@@ -23,7 +23,7 @@ args = parser.parse_args()
 
 model = SoundStream(
     D=256,
-    C=1,
+    C=58,
     strides=(2, 4, 5, 5),
 )
 
