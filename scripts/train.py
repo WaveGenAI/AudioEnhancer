@@ -72,7 +72,7 @@ def mel_loss(logits, target):
     return MSELoss()(logits, target) / 10
 
 
-loss_fn = [MSELoss(), auraloss.time.LogCoshLoss(), mel_loss]
+loss_fn = [MSELoss(), auraloss.time.LogCoshLoss()]
 disc_loss_fn = MSELoss()
 
 # split test and train
@@ -220,8 +220,9 @@ for epoch in range(EPOCH):
             batch_disc = torch.cat([y, y_hat], dim=0)
             disc_pred = discriminator(batch_disc)
             disc_pred = torch.sigmoid(disc_pred).squeeze()
+            labels = [0] * y.shape[0] + [1] * y.shape[0]
             disc_loss = disc_loss_fn(
-                disc_pred, torch.Tensor([0, 1]).to(device, dtype=dtype)
+                disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
             )
 
             loss = sum([loss(y_hat, y) for loss in loss_fn])
