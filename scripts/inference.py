@@ -7,7 +7,6 @@ import argparse
 import torch
 import torchaudio
 
-import setup_paths
 from audioenhancer.constants import SAMPLING_RATE
 from audioenhancer.model.soundstream import SoundStream
 
@@ -28,7 +27,7 @@ model = SoundStream(
     strides=(2, 4, 4, 5),
 )
 
-model.load_state_dict(torch.load("data/model.pth"))
+model.load_state_dict(torch.load("data/model/model_1000.pt"))
 
 
 def load(waveform_path):

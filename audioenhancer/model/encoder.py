@@ -20,7 +20,7 @@ class EncoderBlock(nn.Module):
             ResidualUnit(
                 in_channels=out_channels // 2,
                 out_channels=out_channels // 2,
-                dilation=3,
+                dilation=2,
             ),
             ResidualUnit(
                 in_channels=out_channels // 2,

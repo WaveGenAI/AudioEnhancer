@@ -22,7 +22,19 @@ class SoundStream(nn.Module):
 
         self.encoder = Encoder(C=C, D=D, strides=strides)
         self.decoder = Decoder(C=C, D=D, strides=strides)
-        # self.latent = Latent(D=D)
+        # self.latent = Latent(d_model=D)
+        self.init_weights()
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv1d):
+                m.weight.data.normal_(0, 0.02)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                m.weight.data.normal_(0, 0.02)
+                if m.bias is not None:
+                    nn.init.constant_(m.bias, 0)
 
     def forward(self, x):
         # x: batch_size x 1 x (T / 1)
