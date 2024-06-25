@@ -6,18 +6,26 @@ import argparse
 import os
 
 import auraloss
+import bitsandbytes as bnb
+import setup_paths
 import torch
 import torchaudio
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 
-from audioenhancer.constants import BATCH_SIZE, EPOCH, MAX_AUDIO_LENGTH, LOGGING_STEPS, GRADIENT_ACCUMULATION_STEPS, \
-    SAVE_STEPS, LOSS_THRESHOLD
+from audioenhancer.constants import (
+    BATCH_SIZE,
+    EPOCH,
+    GRADIENT_ACCUMULATION_STEPS,
+    LOGGING_STEPS,
+    LOSS_THRESHOLD,
+    MAX_AUDIO_LENGTH,
+    SAVE_STEPS,
+)
 from audioenhancer.dataset.loader import SynthDataset
 from audioenhancer.model.discriminator.wave_disc import Discriminator
 from audioenhancer.model.soundstream import SoundStream
-import bitsandbytes as bnb
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -51,8 +59,7 @@ dataset = SynthDataset(args.dataset_dir, max_duration=MAX_AUDIO_LENGTH, mono=arg
 writer = SummaryWriter()
 
 mel_spectrogram_transform = torchaudio.transforms.MelSpectrogram(
-    sample_rate=16000,
-    n_mels=64
+    sample_rate=16000, n_mels=64
 )
 
 
@@ -91,7 +98,9 @@ discriminator = Discriminator(
     num_channels=64,
     strides=(2, 4, 4, 5),
 )
-discriminator.load_state_dict(torch.load("data/model/disc.pt"))
+
+if os.path.exists("data/model/disc.pt"):
+    discriminator.load_state_dict(torch.load("data/model/disc.pt"))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device {device}")
@@ -120,14 +129,14 @@ scheduler = lr_scheduler.LinearLR(
     optimizer,
     start_factor=1,
     end_factor=1e-6,
-    total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE)
+    total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 )
 
 disc_scheduler = lr_scheduler.LinearLR(
     disc_optimizer,
     start_factor=1,
     end_factor=1e-6,
-    total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE)
+    total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 )
 
 # print number of parameters
@@ -157,7 +166,9 @@ for epoch in range(EPOCH):
             disc_pred = discriminator(batch_disc)
             disc_pred = torch.sigmoid(disc_pred).squeeze()
             labels = [0] * y.shape[0] + [1] * y.shape[0]
-            disc_loss = disc_loss_fn(disc_pred, torch.Tensor(labels).to(device, dtype=dtype))
+            disc_loss = disc_loss_fn(
+                disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
+            )
             disc_loss.backward()
             logging_desc_loss += disc_loss.detach().cpu().float().numpy()
         else:
@@ -169,10 +180,12 @@ for epoch in range(EPOCH):
                 disc_pred = discriminator(batch_disc)
                 disc_pred = torch.sigmoid(disc_pred).squeeze()
                 labels = [0] * y.shape[0] + [1] * y.shape[0]
-                disc_loss = disc_loss_fn(disc_pred, torch.Tensor(labels).to(device, dtype=dtype))
+                disc_loss = disc_loss_fn(
+                    disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
+                )
             logging_loss += loss.detach().cpu().float().numpy()
             logging_desc_loss += disc_loss.detach().cpu().float().numpy()
-            loss += disc_pred[:-y.shape[0]].mean().squeeze()
+            loss += disc_pred[: -y.shape[0]].mean().squeeze()
             loss.backward()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
@@ -237,15 +250,19 @@ for epoch in range(EPOCH):
             batch_disc = torch.cat([y, y_hat], dim=0)
             disc_pred = discriminator(batch_disc)
             disc_pred = torch.sigmoid(disc_pred).squeeze()
-            disc_loss = disc_loss_fn(disc_pred, torch.Tensor([0, 1]).to(device, dtype=dtype))
+            disc_loss = disc_loss_fn(
+                disc_pred, torch.Tensor([0, 1]).to(device, dtype=dtype)
+            )
 
             loss = sum([loss(y_hat, y) for loss in loss_fn])
 
             loss_test += loss.item()
             loss_desc_test += disc_loss.item()
 
-    print(f"Avg test Loss: {loss_test / len(test_loader)}"
-          f" Desc Loss {loss_desc_test / len(test_loader)}")
+    print(
+        f"Avg test Loss: {loss_test / len(test_loader)}"
+        f" Desc Loss {loss_desc_test / len(test_loader)}"
+    )
 
 print(f"Model step: {model_step} Desc step: {desc_step}")
 print("Training done")

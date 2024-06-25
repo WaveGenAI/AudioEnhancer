@@ -4,6 +4,7 @@ Code for inference.
 
 import argparse
 
+import setup_paths
 import torch
 import torchaudio
 
@@ -19,6 +20,14 @@ parser.add_argument(
     help="The path to the audio file to enhance",
 )
 
+parser.add_argument(
+    "--model_path",
+    type=str,
+    required=False,
+    default="data/model/model_1000.pt",
+    help="The path to the model",
+)
+
 args = parser.parse_args()
 
 model = SoundStream(
@@ -27,7 +36,7 @@ model = SoundStream(
     strides=(2, 4, 4, 5),
 )
 
-model.load_state_dict(torch.load("data/model/model_1000.pt"))
+model.load_state_dict(torch.load(args.model_path))
 
 
 def load(waveform_path):
