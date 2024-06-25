@@ -18,7 +18,6 @@ from audioenhancer.constants import (
     EPOCH,
     GRADIENT_ACCUMULATION_STEPS,
     LOGGING_STEPS,
-    LOSS_THRESHOLD,
     MAX_AUDIO_LENGTH,
     SAVE_STEPS,
 )
@@ -58,7 +57,10 @@ dataset = SynthDataset(args.dataset_dir, max_duration=MAX_AUDIO_LENGTH, mono=arg
 writer = SummaryWriter()
 
 mel_spectrogram_transform = torchaudio.transforms.MelSpectrogram(
-    sample_rate=16000, n_mels=64
+    sample_rate=16000,
+    n_mels=128,
+    n_fft=1024,
+    normalized=True,
 )
 
 
@@ -67,7 +69,7 @@ def mel_loss(logits, target):
     target = target.float()
     logits = mel_spectrogram_transform(logits)
     target = mel_spectrogram_transform(target)
-    return MSELoss()(logits, target) / 300_000
+    return MSELoss()(logits, target) / 10
 
 
 loss_fn = [MSELoss(), auraloss.time.LogCoshLoss(), mel_loss]
@@ -144,9 +146,6 @@ print(f"Number of parameters: {sum(p.numel() for p in model.parameters()) / 1e6}
 step = 0
 logging_loss = 0
 logging_desc_loss = 0
-num_train_disc_step = -1000
-model_step = 0
-desc_step = 0
 for epoch in range(EPOCH):
     model.train()
     for batch in train_loader:
@@ -154,67 +153,39 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
-        if num_train_disc_step > 0:
-            desc_step += 1
-            with torch.no_grad():
-                y_hat = model(y)
-                loss = sum([loss(y_hat, y) for loss in loss_fn]) * 10
-                logging_loss += loss.detach().cpu().float().numpy()
+        y_hat = model(y)
+        loss = sum([loss(y_hat, y) for loss in loss_fn]) * 10
 
-            batch_disc = torch.cat([y, y_hat], dim=0)
-            disc_pred = discriminator(batch_disc)
-            disc_pred = torch.sigmoid(disc_pred).squeeze()
-            labels = [0] * y.shape[0] + [1] * y.shape[0]
-            disc_loss = disc_loss_fn(
-                disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
-            )
-            disc_loss.backward()
-            logging_desc_loss += disc_loss.detach().cpu().float().numpy()
-        else:
-            model_step += 1
-            y_hat = model(y)
-            loss = sum([loss(y_hat, y) for loss in loss_fn]) * 10
-            with torch.no_grad():
-                batch_disc = torch.cat([y, y_hat], dim=0)
-                disc_pred = discriminator(batch_disc)
-                disc_pred = torch.sigmoid(disc_pred).squeeze()
-                labels = [0] * y.shape[0] + [1] * y.shape[0]
-                disc_loss = disc_loss_fn(
-                    disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
-                )
-            logging_loss += loss.detach().cpu().float().numpy()
-            logging_desc_loss += disc_loss.detach().cpu().float().numpy()
-            loss += disc_pred[: -y.shape[0]].mean().squeeze()
-            loss.backward()
+        loss.backward()
+        batch_disc = torch.cat([y, y_hat], dim=0)
+        disc_pred = discriminator(batch_disc)
+        disc_pred = torch.sigmoid(disc_pred).squeeze()
+        labels = [0] * y.shape[0] + [1] * y.shape[0]
+        disc_loss = disc_loss_fn(
+            disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
+        )
+
+        logging_loss += loss.detach().cpu().float().numpy()
+        logging_desc_loss += disc_loss.detach().cpu().float().numpy()
+        loss += disc_pred[: -y.shape[0]].mean().squeeze()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2)
-            num_step = 10 - step % GRADIENT_ACCUMULATION_STEPS
 
-            if num_train_disc_step == 0:
-                if (logging_desc_loss / num_step) > LOSS_THRESHOLD:
-                    num_train_disc_step = 5
-                else:
-                    num_train_disc_step = -5
+            for name, param in discriminator.named_parameters():
+                if param.grad is not None:
+                    param.grad /= GRADIENT_ACCUMULATION_STEPS
 
-            if num_train_disc_step > 0:
-                for name, param in discriminator.named_parameters():
-                    if param.grad is not None:
-                        param.grad /= GRADIENT_ACCUMULATION_STEPS
+            disc_optimizer.step()
+            disc_optimizer.zero_grad()
+            disc_scheduler.step()
+            for name, param in model.named_parameters():
+                if param.grad is not None:
+                    param.grad /= GRADIENT_ACCUMULATION_STEPS
 
-                disc_optimizer.step()
-                disc_optimizer.zero_grad()
-                disc_scheduler.step()
-                num_train_disc_step -= 1
-            else:
-                for name, param in model.named_parameters():
-                    if param.grad is not None:
-                        param.grad /= GRADIENT_ACCUMULATION_STEPS
-
-                optimizer.step()
-                optimizer.zero_grad()
-                scheduler.step()
-                num_train_disc_step += 1
+            optimizer.step()
+            optimizer.zero_grad()
+            scheduler.step()
 
         if (step % LOGGING_STEPS) == 0:
             writer.add_scalar("Loss", logging_loss / LOGGING_STEPS, step)
@@ -263,7 +234,6 @@ for epoch in range(EPOCH):
         f" Desc Loss {loss_desc_test / len(test_loader)}"
     )
 
-print(f"Model step: {model_step} Desc step: {desc_step}")
 print("Training done")
 torch.save(model.state_dict(), args.model_path + "model.pt")
 torch.save(discriminator.state_dict(), args.model_path + "disc.pt")
