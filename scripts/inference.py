@@ -4,7 +4,6 @@ Code for inference.
 
 import argparse
 
-import setup_paths
 import torch
 import torchaudio
 
@@ -62,5 +61,5 @@ output = output.squeeze(0)
 output = output.detach()
 audio = audio.squeeze(0)
 
-torchaudio.save("../data/input.mp3", audio.T, SAMPLING_RATE, channels_first=False)
-torchaudio.save("../data/output.mp3", output.T, SAMPLING_RATE, channels_first=False)
+torchaudio.save("./data/input.mp3", audio.T, SAMPLING_RATE, channels_first=False)
+torchaudio.save("./data/output.mp3", output.T, SAMPLING_RATE, channels_first=False)

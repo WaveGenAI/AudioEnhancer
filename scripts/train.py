@@ -7,7 +7,6 @@ import os
 
 import auraloss
 import bitsandbytes as bnb
-import setup_paths
 import torch
 import torchaudio
 from torch.nn import MSELoss

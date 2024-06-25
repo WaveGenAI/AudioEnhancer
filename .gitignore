@@ -161,7 +161,8 @@ cython_debug/
 
 test.py
 
-data/model.pth
+*.pt
 data/output.*
-
+*.pth
 runs/
+data/input.mp3

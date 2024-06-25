@@ -6,7 +6,6 @@ The codec is used to encode the audio files.
 
 import argparse
 
-import setup_paths
 from audioenhancer.dataset.build import DatasetBuilder
 from audioenhancer.dataset.codec import DAC, Encodec, Opus, Soundstream
 
