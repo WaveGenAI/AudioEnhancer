@@ -6,6 +6,7 @@ import argparse
 
 import torch
 import torchaudio
+from audio_encoders_pytorch import AutoEncoder1d
 
 from audioenhancer.constants import SAMPLING_RATE
 from audioenhancer.model.soundstream import SoundStream
@@ -29,10 +30,17 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-model = SoundStream(
-    D=512,
-    C=64,
-    strides=(2, 4, 4, 5),
+model = AutoEncoder1d(
+    in_channels=2,  # Number of input channels
+    channels=32,  # Number of base channels
+    multipliers=[
+        1,
+        1,
+        2,
+        2,
+    ],  # Channel multiplier between layers (i.e. channels * multiplier[i] -> channels * multiplier[i+1])
+    factors=[4, 4, 4],  # Downsampling/upsampling factor per layer
+    num_blocks=[2, 2, 2],  # Number of resnet blocks per layer
 )
 
 model.load_state_dict(torch.load(args.model_path))

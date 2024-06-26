@@ -9,6 +9,7 @@ import auraloss
 import bitsandbytes as bnb
 import torch
 import torchaudio
+from audio_encoders_pytorch import AutoEncoder1d
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
@@ -92,10 +93,17 @@ test_loader = torch.utils.data.DataLoader(
     test_dataset, batch_size=BATCH_SIZE, shuffle=False
 )
 
-model = SoundStream(
-    D=512,
-    C=64,
-    strides=(2, 4, 4, 5),
+model = AutoEncoder1d(
+    in_channels=2,  # Number of input channels
+    channels=32,  # Number of base channels
+    multipliers=[
+        1,
+        1,
+        2,
+        2,
+    ],  # Channel multiplier between layers (i.e. channels * multiplier[i] -> channels * multiplier[i+1])
+    factors=[4, 4, 4],  # Downsampling/upsampling factor per layer
+    num_blocks=[2, 2, 2],  # Number of resnet blocks per layer
 )
 discriminator = Discriminator(
     latent_dim=512,
@@ -170,7 +178,7 @@ for epoch in range(EPOCH):
 
         logging_loss += loss.detach().cpu().float().numpy()
         logging_desc_loss += disc_loss.detach().cpu().float().numpy()
-        loss += disc_pred[: -y.shape[0]].mean().squeeze()
+        # loss += disc_pred[: -y.shape[0]].mean().squeeze()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), 2)
