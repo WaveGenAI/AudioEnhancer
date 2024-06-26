@@ -32,7 +32,7 @@ class SoundStream(nn.Module):
 
         self.encoder = Encoder(C=C, D=D, strides=strides)
         self.decoder = Decoder(C=C, D=D, strides=strides)
-        # self.latent = Latent(d_model=D)
+        self.latent = Latent(d_model=D)
         self.init_weights()
 
     def init_weights(self):
@@ -56,7 +56,7 @@ class SoundStream(nn.Module):
         # o: batch_size x 1 x (T / 1)
 
         e, skips = self.encoder(x)
-        # l = self.latent(e)
+        e = self.latent(e)
         o = self.decoder(e, skips)
 
         return o

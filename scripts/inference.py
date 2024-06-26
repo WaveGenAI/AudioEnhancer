@@ -7,7 +7,7 @@ import argparse
 import torch
 import torchaudio
 
-from audioenhancer.constants import SAMPLING_RATE
+from audioenhancer.constants import SAMPLING_RATE, MAX_AUDIO_LENGTH
 from audioenhancer.model.soundstream import SoundStream
 
 parser = argparse.ArgumentParser()
@@ -55,12 +55,18 @@ def load(waveform_path):
 
     waveform = waveform.unsqueeze(0)
 
-    return waveform[:, :, : SAMPLING_RATE * 10]
+    return waveform
 
 
 audio = load(args.audio)
 
-output = model(audio)
+output = torch.Tensor()
+
+for i in range(0, audio.size(2), int(SAMPLING_RATE * MAX_AUDIO_LENGTH)):
+    chunk = audio[:, :, i : i + int(SAMPLING_RATE * MAX_AUDIO_LENGTH)]
+    with torch.no_grad():
+        output = torch.cat([output, model(chunk)], dim=2)
+
 output = output.squeeze(0)
 
 # fix runtime error: numpy

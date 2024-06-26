@@ -49,7 +49,7 @@ class Discriminator(nn.Module):
         """
         super().__init__()
         self.encoder = Encoder(C=num_channels, D=latent_dim, strides=strides)
-        self.latent = Latent(d_model=latent_dim, intermediate_dim=1024, num_layers=4)
+        self.latent = Latent(d_model=latent_dim, num_layers=4)
         self.pooler = Pooler(d_model=latent_dim)
         self.classifier = nn.Linear(latent_dim, 1)
         self.init_weights()
