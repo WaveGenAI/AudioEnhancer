@@ -94,7 +94,7 @@ test_loader = torch.utils.data.DataLoader(
 
 model = SoundStream(
     D=512,
-    C=64,
+    C=58,
     strides=(2, 4, 4, 5),
 )
 discriminator = Discriminator(
@@ -117,7 +117,7 @@ optimizer = bnb.optim.AdamW8bit(
     [
         {"params": model.parameters()},
     ],
-    lr=6e-5,
+    lr=8e-5,
     weight_decay=5e-5,
 )
 
@@ -125,7 +125,7 @@ disc_optimizer = bnb.optim.AdamW8bit(
     [
         {"params": discriminator.parameters()},
     ],
-    lr=6e-5,
+    lr=8e-5,
     weight_decay=5e-5,
 )
 
