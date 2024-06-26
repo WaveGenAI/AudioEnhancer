@@ -3,8 +3,8 @@
 import torch
 from torch import nn
 
-from audioenhancer.model.encoder import Encoder
-from audioenhancer.model.latent import Latent
+from audioenhancer.model.soudstream.encoder import Encoder
+from audioenhancer.model.soudstream.latent import Latent
 
 
 class Pooler(nn.Module):

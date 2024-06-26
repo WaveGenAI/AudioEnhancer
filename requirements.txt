@@ -11,3 +11,4 @@ datasets
 auraloss
 pydub
 bitsandbytes
+einops

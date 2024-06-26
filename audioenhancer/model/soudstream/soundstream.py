@@ -8,9 +8,9 @@ from functools import reduce
 import torch
 from torch import nn
 
-from audioenhancer.model.decoder import Decoder
-from audioenhancer.model.encoder import Encoder
-from audioenhancer.model.latent import Latent
+from audioenhancer.model.soudstream.decoder import Decoder
+from audioenhancer.model.soudstream.encoder import Encoder
+from audioenhancer.model.soudstream.latent import Latent
 
 
 class SoundStream(nn.Module):

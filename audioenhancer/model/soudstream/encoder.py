@@ -5,7 +5,7 @@ Encoder block
 import torch
 import torch.nn as nn
 
-from audioenhancer.model.modules import CausalConv1d, ResidualUnit
+from audioenhancer.model.soudstream.modules import CausalConv1d, ResidualUnit
 
 
 class EncoderBlock(nn.Module):

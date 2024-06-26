@@ -8,7 +8,7 @@ import torch
 import torchaudio
 
 from audioenhancer.constants import SAMPLING_RATE, MAX_AUDIO_LENGTH
-from audioenhancer.model.soundstream import SoundStream
+from audioenhancer.model.audio_ae.auto_encoder import AutoEncoder1d
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -23,16 +23,24 @@ parser.add_argument(
     "--model_path",
     type=str,
     required=False,
-    default="data/model/model.pt",
+    default="data/model/model_2000.pt",
     help="The path to the model",
 )
 
 args = parser.parse_args()
 
-model = SoundStream(
-    D=512,
-    C=64,
-    strides=(2, 4, 4, 5),
+model = AutoEncoder1d(
+    in_channels=2,  # Number of input channels
+    channels=32,  # Number of base channels
+    multipliers=[
+        2,
+        4,
+        8,
+        12,
+        16,
+    ],  # Channel multiplier between layers (i.e. channels * multiplier[i] -> channels * multiplier[i+1])
+    factors=[2, 4, 4, 8,],  # Downsampling/upsampling factor per layer
+    num_blocks=[2, 2, 2, 2,],  # Number of resnet blocks per layer
 )
 
 model.load_state_dict(torch.load(args.model_path))
@@ -58,9 +66,11 @@ def load(waveform_path):
     return waveform
 
 
-audio = load(args.audio)
+audio = load(args.audio).cuda()
 
-output = torch.Tensor()
+output = torch.Tensor().cuda()
+model.eval()
+model.cuda()
 
 for i in range(0, audio.size(2), int(SAMPLING_RATE * MAX_AUDIO_LENGTH)):
     chunk = audio[:, :, i : i + int(SAMPLING_RATE * MAX_AUDIO_LENGTH)]
@@ -70,8 +80,8 @@ for i in range(0, audio.size(2), int(SAMPLING_RATE * MAX_AUDIO_LENGTH)):
 output = output.squeeze(0)
 
 # fix runtime error: numpy
-output = output.detach()
-audio = audio.squeeze(0)
+output = output.detach().cpu()
+audio = audio.squeeze(0).detach().cpu()
 
 torchaudio.save("./data/input.mp3", audio.T, SAMPLING_RATE, channels_first=False)
 torchaudio.save("./data/output.mp3", output.T, SAMPLING_RATE, channels_first=False)

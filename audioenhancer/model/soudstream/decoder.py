@@ -3,7 +3,7 @@ from typing import List
 import torch
 from torch import nn
 
-from audioenhancer.model.modules import CausalConvTranspose1d, ResidualUnit
+from audioenhancer.model.soudstream.modules import CausalConvTranspose1d, ResidualUnit
 
 
 class DecoderBlock(nn.Module):
