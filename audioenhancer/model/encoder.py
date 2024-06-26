@@ -1,6 +1,7 @@
 """
 Encoder block
 """
+
 import torch
 import torch.nn as nn
 
@@ -16,6 +17,7 @@ class EncoderBlock(nn.Module):
         out_channels (int): The number of output channels
         stride (int): The stride for the convolutional layer
     """
+
     def __init__(self, out_channels, stride):
         super().__init__()
 
@@ -50,6 +52,7 @@ class EncoderBlock(nn.Module):
 
 class Encoder(nn.Module):
     """Encoder"""
+
     def __init__(self, C, D, strides=(2, 4, 5, 8)):
         """
         The Encoder is composed of a series of EncoderBlock layers followed by a convolutional layer.
@@ -85,4 +88,10 @@ class Encoder(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass"""
-        return self.layers(x)
+
+        skips = []
+        for layer in self.layers:
+            skips.append(x)
+            x = layer(x)
+
+        return x, skips

@@ -156,7 +156,7 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
-        y_hat = model(y)
+        y_hat = model(x)
         loss = sum(loss(y_hat, y) for loss in loss_fn) * 10
 
         loss.backward()
@@ -219,7 +219,7 @@ for epoch in range(EPOCH):
             x = batch[0].to(device, dtype=dtype)
             y = batch[1].to(device, dtype=dtype)
 
-            y_hat = model(y)
+            y_hat = model(x)
             batch_disc = torch.cat([y, y_hat], dim=0)
             disc_pred = discriminator(batch_disc)
             disc_pred = torch.sigmoid(disc_pred).squeeze()
