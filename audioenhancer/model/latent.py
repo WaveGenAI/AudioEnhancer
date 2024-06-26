@@ -3,11 +3,22 @@ Latent layer for the model
 """
 
 import torch
-import torch.nn as nn
+from torch import nn
 
 
 class Latent(nn.Module):
+    """Latent layer for the model"""
     def __init__(self, d_model: int = 256, intermediate_dim: int = 1024, num_layers: int = 4):
+        """
+        Latent layer for the model
+
+        This layer is composed of a TransformerEncoder layer that will process the latent space.
+
+        Args:
+            d_model (int, optional): The dimension of the model. Defaults to 256.
+            intermediate_dim (int, optional): The intermediate dimension. Defaults to 1024.
+            num_layers (int, optional): The number of layers. Defaults to 4.
+        """
         super(Latent, self).__init__()
 
         encoder_layer = nn.TransformerEncoderLayer(

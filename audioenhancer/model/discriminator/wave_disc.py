@@ -1,14 +1,24 @@
+"""This module contains the wave discriminator model."""
 import torch
 from torch import nn
 
-import math
-from audioenhancer.constants import MAX_AUDIO_LENGTH
 from audioenhancer.model.encoder import Encoder
 from audioenhancer.model.latent import Latent
 
 
 class Pooler(nn.Module):
+    """
+    Pooler layer for the discriminator. This class come from the bert pooler:
+    https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py#L736
+    """
     def __init__(self, d_model: int = 256):
+        """
+        Pooler layer for the discriminator.
+        Selects the first token of the sequence and applies a linear layer with a tanh activation.
+
+        Args:
+            d_model (int, optional): The dimension of the model. Defaults to 256.
+        """
         super().__init__()
         self.dense = nn.Linear(d_model, d_model)
         self.activation = nn.Tanh()
@@ -23,7 +33,16 @@ class Pooler(nn.Module):
 
 
 class Discriminator(nn.Module):
+    """Wave discriminator model."""
     def __init__(self, latent_dim, num_channels, strides=(2, 4, 5, 8)):
+        """
+        Wave discriminator model.
+
+        Args:
+            latent_dim (int): The latent dimension
+            num_channels (int): The number of channels
+            strides (tuple, optional): The strides for the encoder's convolutional layers. Defaults to (2, 4, 5, 8).
+        """
         super(Discriminator, self).__init__()
         self.encoder = Encoder(C=num_channels, D=latent_dim, strides=strides)
         self.latent = Latent(d_model=latent_dim, intermediate_dim=1024, num_layers=4)
@@ -33,6 +52,9 @@ class Discriminator(nn.Module):
         torch.cuda.empty_cache()
 
     def init_weights(self):
+        """
+        Initialize the weights with a normal distribution.
+        """
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 m.weight.data.normal_(0, 0.02)

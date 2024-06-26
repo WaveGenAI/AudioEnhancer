@@ -3,7 +3,6 @@ Module to build the dataset
 """
 
 import os
-import shutil
 from concurrent.futures import ThreadPoolExecutor
 from typing import List
 

@@ -1,10 +1,18 @@
-import torch.nn as nn
+from torch import nn
 
 from audioenhancer.model.modules import CausalConvTranspose1d, ResidualUnit
 
 
 class DecoderBlock(nn.Module):
+    """Decoder block"""
     def __init__(self, out_channels, stride):
+        """
+        The Decoder block is composed of a CausalConvTranspose1d layer followed by three ResidualUnit layers.
+
+        Args:
+            out_channels (int): The number of output channels
+            stride (int): The stride of the convolutional layer
+        """
         super(DecoderBlock, self).__init__()
 
         self.layers = nn.Sequential(
@@ -30,7 +38,17 @@ class DecoderBlock(nn.Module):
 
 
 class Decoder(nn.Module):
+    """Decoder"""
     def __init__(self, C, D, strides=(2, 4, 5, 8)):
+        """
+        The Decoder is composed of a series of DecoderBlock layers followed by a convolutional layer.
+        It decompresses the audio signal.
+
+        Args:
+            C (int): The number of channels
+            D (int): The latent space dimension
+            strides (tuple, optional): The strides of the convolutional layers. Defaults to (2, 4, 5, 8).
+        """
         super(Decoder, self).__init__()
 
         self.layers = nn.Sequential(

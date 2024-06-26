@@ -39,6 +39,12 @@ model.load_state_dict(torch.load(args.model_path))
 
 
 def load(waveform_path):
+    """
+    Load the waveform from the given path and resample it to the desired sampling rate.
+
+    Args:
+        waveform_path (str): The path to the waveform file.
+    """
     waveform, sample_rate = torchaudio.load(waveform_path)
     resampler = torchaudio.transforms.Resample(
         sample_rate, SAMPLING_RATE, dtype=waveform.dtype

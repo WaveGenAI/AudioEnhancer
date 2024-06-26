@@ -65,6 +65,9 @@ mel_spectrogram_transform = torchaudio.transforms.MelSpectrogram(
 
 
 def mel_loss(logits, target):
+    """
+    Compute the MSE loss between the mel spectrogram of the logits and the target.
+    """
     logits = logits.float()
     target = target.float()
     logits = mel_spectrogram_transform(logits)

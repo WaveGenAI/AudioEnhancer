@@ -8,6 +8,14 @@ from audioenhancer.model.modules import CausalConv1d, ResidualUnit
 
 
 class EncoderBlock(nn.Module):
+    """
+    Encoder block
+    The Encoder block is composed of a series of ResidualUnit layers followed by a CausalConv1d layer.
+
+    Args:
+        out_channels (int): The number of output channels
+        stride (int): The stride for the convolutional layer
+    """
     def __init__(self, out_channels, stride):
         super(EncoderBlock, self).__init__()
 
@@ -40,7 +48,17 @@ class EncoderBlock(nn.Module):
 
 
 class Encoder(nn.Module):
+    """Encoder"""
     def __init__(self, C, D, strides=(2, 4, 5, 8)):
+        """
+        The Encoder is composed of a series of EncoderBlock layers followed by a convolutional layer.
+        It compresses the audio signal.
+
+        Args:
+            C (int): The number of channels
+            D (int): The latent space dimension
+            strides (tuple, optional): The strides of the convolutional layers. Defaults to (2, 4, 5, 8).
+        """
         super(Encoder, self).__init__()
 
         self.layers = nn.Sequential(

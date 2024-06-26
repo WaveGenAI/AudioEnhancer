@@ -5,7 +5,7 @@ Note: All the code come from https://github.com/haydenshively/SoundStream/tree/m
 
 from functools import reduce
 
-import torch.nn as nn
+from torch import nn
 
 from audioenhancer.model.decoder import Decoder
 from audioenhancer.model.encoder import Encoder
@@ -13,7 +13,16 @@ from audioenhancer.model.latent import Latent
 
 
 class SoundStream(nn.Module):
+    """SoundStream model."""
     def __init__(self, D, C, strides=(2, 4, 5, 8)):
+        """
+        SoundStream model.
+
+        Args:
+            D (int): The latent space dimension
+            C (int): The number of channels
+            strides (tuple, optional): The strides for the encoder's convolutional layers. Defaults to (2, 4, 5, 8).
+        """
         super(SoundStream, self).__init__()
 
         # The temporal resampling ratio between input waveform and embeddings.
@@ -26,6 +35,9 @@ class SoundStream(nn.Module):
         self.init_weights()
 
     def init_weights(self):
+        """
+        Initialize the weights with a normal distribution.
+        """
         for m in self.modules():
             if isinstance(m, nn.Conv1d):
                 m.weight.data.normal_(0, 0.02)
