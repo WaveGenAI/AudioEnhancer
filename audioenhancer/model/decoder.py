@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 from torch import nn
 
@@ -6,6 +8,7 @@ from audioenhancer.model.modules import CausalConvTranspose1d, ResidualUnit
 
 class DecoderBlock(nn.Module):
     """Decoder block"""
+
     def __init__(self, out_channels, stride):
         """
         The Decoder block is composed of a CausalConvTranspose1d layer followed by three ResidualUnit layers.
@@ -40,6 +43,7 @@ class DecoderBlock(nn.Module):
 
 class Decoder(nn.Module):
     """Decoder"""
+
     def __init__(self, C, D, strides=(2, 4, 5, 8)):
         """
         The Decoder is composed of a series of DecoderBlock layers followed by a convolutional layer.
@@ -73,6 +77,11 @@ class Decoder(nn.Module):
             ),
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, skips: List[torch.Tensor]) -> torch.Tensor:
         """Forward pass"""
-        return self.layers(x)
+
+        for skip, layer in zip(reversed(skips), self.layers):
+            x = layer(x)
+            x = x + skip
+
+        return x

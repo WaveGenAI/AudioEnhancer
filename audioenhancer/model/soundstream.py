@@ -15,6 +15,7 @@ from audioenhancer.model.latent import Latent
 
 class SoundStream(nn.Module):
     """SoundStream model."""
+
     def __init__(self, D, C, strides=(2, 4, 5, 8)):
         """
         SoundStream model.
@@ -54,8 +55,8 @@ class SoundStream(nn.Module):
         # e: batch_size x (T / M) x D --- where M is product of all numbers in `strides` tuple
         # o: batch_size x 1 x (T / 1)
 
-        e = self.encoder(x)
+        e, skips = self.encoder(x)
         # l = self.latent(e)
-        o = self.decoder(e)
+        o = self.decoder(e, skips)
 
         return o

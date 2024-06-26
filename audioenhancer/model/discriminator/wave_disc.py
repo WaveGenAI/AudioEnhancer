@@ -1,4 +1,5 @@
 """This module contains the wave discriminator model."""
+
 import torch
 from torch import nn
 
@@ -11,6 +12,7 @@ class Pooler(nn.Module):
     Pooler layer for the discriminator. This class come from the bert pooler:
     https://github.com/huggingface/transformers/blob/main/src/transformers/models/bert/modeling_bert.py#L736
     """
+
     def __init__(self, d_model: int = 256):
         """
         Pooler layer for the discriminator.
@@ -35,6 +37,7 @@ class Pooler(nn.Module):
 
 class Discriminator(nn.Module):
     """Wave discriminator model."""
+
     def __init__(self, latent_dim, num_channels, strides=(2, 4, 5, 8)):
         """
         Wave discriminator model.
@@ -68,7 +71,7 @@ class Discriminator(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass"""
-        e = self.encoder(x)
+        e, _ = self.encoder(x)
         l = self.latent(e).permute(0, 2, 1)
         p = self.pooler(l)
         logits = self.classifier(p)
