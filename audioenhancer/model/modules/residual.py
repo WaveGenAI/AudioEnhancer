@@ -2,11 +2,23 @@
 Residual unit module.
 """
 
-import torch.nn as nn
+from torch import nn
 
 
 class ResidualUnit(nn.Module):
+    """
+    Residual unit module.
+    """
     def __init__(self, in_channels, out_channels, dilation, pad_mode="reflect"):
+        """
+        Residual unit module.
+
+        Args:
+            in_channels (int): The number of input channels
+            out_channels (int): The number of output channels
+            dilation (int): The dilation factor
+            pad_mode (str, optional): The padding mode. Defaults to "reflect".
+        """
         super(ResidualUnit, self).__init__()
 
         self.dilation = dilation
