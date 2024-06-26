@@ -1,7 +1,7 @@
 """ 
 Convolutional neural network module.
 """
-
+import torch
 from torch import nn
 import torch.nn.functional as F
 
@@ -20,7 +20,7 @@ class CausalConv1d(nn.Module):
             kernel_size (int): The kernel size
             pad_mode (str, optional): The padding mode. Defaults to "reflect".
         """
-        super(CausalConv1d, self).__init__()
+        super().__init__()
 
         dilation = kwargs.get("dilation", 1)
         stride = kwargs.get("stride", 1)
@@ -29,7 +29,8 @@ class CausalConv1d(nn.Module):
         self.causal_padding = dilation * (kernel_size - 1) + (1 - stride)
         self.conv = nn.Conv1d(in_channels, out_channels, kernel_size, **kwargs)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass"""
         x = F.pad(x, [self.causal_padding, 0], mode=self.pad_mode)
         return self.conv(x)
 
@@ -40,14 +41,15 @@ class CausalConvTranspose1d(nn.Module):
         """
         Causal convolutional transpose layer.
         """
-        super(CausalConvTranspose1d, self).__init__()
+        super().__init__()
 
         self.upsample_factor = stride
         self.conv = nn.ConvTranspose1d(
             in_channels, out_channels, kernel_size, stride, **kwargs
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass"""
         n = x.shape[-1]
 
         out = self.conv(x)

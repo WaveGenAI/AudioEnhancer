@@ -157,7 +157,7 @@ for epoch in range(EPOCH):
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
         y_hat = model(y)
-        loss = sum([loss(y_hat, y) for loss in loss_fn]) * 10
+        loss = sum(loss(y_hat, y) for loss in loss_fn) * 10
 
         loss.backward()
         batch_disc = torch.cat([y, y_hat], dim=0)
@@ -228,7 +228,7 @@ for epoch in range(EPOCH):
                 disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
             )
 
-            loss = sum([loss(y_hat, y) for loss in loss_fn])
+            loss = sum(loss(y_hat, y) for loss in loss_fn)
 
             loss_test += loss.item()
             loss_desc_test += disc_loss.item()

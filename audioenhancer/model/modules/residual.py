@@ -1,7 +1,7 @@
 """
 Residual unit module.
 """
-
+import torch
 from torch import nn
 
 
@@ -19,7 +19,7 @@ class ResidualUnit(nn.Module):
             dilation (int): The dilation factor
             pad_mode (str, optional): The padding mode. Defaults to "reflect".
         """
-        super(ResidualUnit, self).__init__()
+        super().__init__()
 
         self.dilation = dilation
 
@@ -42,5 +42,6 @@ class ResidualUnit(nn.Module):
             nn.ELU(),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass"""
         return x + self.layers(x)

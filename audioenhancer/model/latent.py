@@ -19,7 +19,7 @@ class Latent(nn.Module):
             intermediate_dim (int, optional): The intermediate dimension. Defaults to 1024.
             num_layers (int, optional): The number of layers. Defaults to 4.
         """
-        super(Latent, self).__init__()
+        super().__init__()
 
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=d_model, nhead=16, dim_feedforward=intermediate_dim
@@ -27,7 +27,7 @@ class Latent(nn.Module):
         self.transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
+        """Forward pass
 
         Args:
             x (torch.Tensor): Input tensor

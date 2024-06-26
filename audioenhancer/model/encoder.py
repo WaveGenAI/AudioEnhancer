@@ -1,7 +1,7 @@
 """
 Encoder block
 """
-
+import torch
 import torch.nn as nn
 
 from audioenhancer.model.modules import CausalConv1d, ResidualUnit
@@ -17,7 +17,7 @@ class EncoderBlock(nn.Module):
         stride (int): The stride for the convolutional layer
     """
     def __init__(self, out_channels, stride):
-        super(EncoderBlock, self).__init__()
+        super().__init__()
 
         self.layers = nn.Sequential(
             ResidualUnit(
@@ -43,7 +43,8 @@ class EncoderBlock(nn.Module):
             ),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass"""
         return self.layers(x)
 
 
@@ -59,7 +60,7 @@ class Encoder(nn.Module):
             D (int): The latent space dimension
             strides (tuple, optional): The strides of the convolutional layers. Defaults to (2, 4, 5, 8).
         """
-        super(Encoder, self).__init__()
+        super().__init__()
 
         self.layers = nn.Sequential(
             nn.Conv1d(
@@ -82,5 +83,6 @@ class Encoder(nn.Module):
             ),
         )
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass"""
         return self.layers(x)

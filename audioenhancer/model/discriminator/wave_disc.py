@@ -24,6 +24,7 @@ class Pooler(nn.Module):
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        """Forward pass"""
         # We "pool" the model by simply taking the hidden state corresponding
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
@@ -43,7 +44,7 @@ class Discriminator(nn.Module):
             num_channels (int): The number of channels
             strides (tuple, optional): The strides for the encoder's convolutional layers. Defaults to (2, 4, 5, 8).
         """
-        super(Discriminator, self).__init__()
+        super().__init__()
         self.encoder = Encoder(C=num_channels, D=latent_dim, strides=strides)
         self.latent = Latent(d_model=latent_dim, intermediate_dim=1024, num_layers=4)
         self.pooler = Pooler(d_model=latent_dim)
@@ -65,7 +66,8 @@ class Discriminator(nn.Module):
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass"""
         e = self.encoder(x)
         l = self.latent(e).permute(0, 2, 1)
         p = self.pooler(l)
