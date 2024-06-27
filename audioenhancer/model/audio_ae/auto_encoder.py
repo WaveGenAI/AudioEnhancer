@@ -78,6 +78,7 @@ class AutoEncoder1d(nn.Module):
             **prefix_dict("encoder_", info_encoder),
             **prefix_dict("decoder_", info_decoder),
         }
+
         return (y, info) if with_info else y
 
     def encode(
