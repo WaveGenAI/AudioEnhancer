@@ -192,7 +192,7 @@ for epoch in range(EPOCH):
         y = batch[1].to(device, dtype=dtype)
 
         y_hat = model(x)
-        loss = sum(loss(y_hat, up_y) for loss in loss_fn)
+        loss = sum(loss(y_hat, y) for loss in loss_fn)
         loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
