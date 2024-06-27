@@ -1,6 +1,5 @@
 """This module contains all the process for the latent space of the audio autoencoder."""
 
-import torch
 from torch import nn
 
 from audioenhancer.model.audio_ae.mamba import MambaBlock
@@ -15,8 +14,8 @@ class LatentConfig:
             self,
             latent_dim,
             num_layer,
-            state_size=16,
-            conv_kernel=4,
+            state_size=32,
+            conv_kernel=3,
             intermediate_size=1024,
             time_step_max=0.001,
             time_step_min=0.1,
