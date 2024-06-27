@@ -190,9 +190,8 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
-        up_y = batch[2].to(device, dtype=dtype)
 
-        y_hat = model(y)
+        y_hat = model(x)
         loss = sum(loss(y_hat, up_y) for loss in loss_fn)
         loss.backward()
 
@@ -255,10 +254,8 @@ for epoch in range(EPOCH):
         for batch in test_loader:
             x = batch[0].to(device, dtype=dtype)
             y = batch[1].to(device, dtype=dtype)
-            up_y = batch[2].to(device, dtype=dtype)
-
-            y_hat = model(y)
-            loss = sum(loss(y_hat, up_y) for loss in loss_fn)
+            y_hat = model(x)
+            loss = sum(loss(y_hat, y) for loss in loss_fn)
             # batch_disc = torch.cat([y, y_hat], dim=0)
             # disc_pred = discriminator(batch_disc)
             # disc_pred = torch.sigmoid(disc_pred).squeeze()

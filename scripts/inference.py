@@ -7,7 +7,7 @@ import argparse
 import torch
 import torchaudio
 
-from audioenhancer.constants import SAMPLING_RATE, MAX_AUDIO_LENGTH
+from audioenhancer.constants import SAMPLING_RATE, MAX_AUDIO_LENGTH, INPUT_FREQ
 from audioenhancer.model.audio_ae.auto_encoder import AutoEncoder1d
 
 parser = argparse.ArgumentParser()
@@ -81,7 +81,7 @@ def load(waveform_path):
     """
     waveform, sample_rate = torchaudio.load(waveform_path)
     resampler = torchaudio.transforms.Resample(
-        sample_rate, args.sampling_rate, dtype=waveform.dtype
+        sample_rate, INPUT_FREQ, dtype=waveform.dtype
     )
     waveform = resampler(waveform)
     if waveform.shape[0] == 1:
@@ -118,5 +118,5 @@ output = output.squeeze(0)
 output = output.detach().cpu()
 audio = audio.squeeze(0).detach().cpu()
 
-torchaudio.save("./data/input.mp3", audio.T, args.sampling_rate, channels_first=False)
+torchaudio.save("./data/input.mp3", audio.T, SAMPLING_RATE, channels_first=False)
 torchaudio.save("./data/output.mp3", output.T, args.sampling_rate, channels_first=False)
