@@ -19,6 +19,8 @@ from audioenhancer.constants import (
     LOGGING_STEPS,
     MAX_AUDIO_LENGTH,
     SAVE_STEPS,
+    INPUT_FREQ,
+    OUTPUT_FREQ,
 )
 from audioenhancer.dataset.loader import SynthDataset
 from audioenhancer.model.audio_ae.auto_encoder import AutoEncoder1d
@@ -51,7 +53,13 @@ args = parser.parse_args()
 dtype = torch.bfloat16
 
 # Load the dataset
-dataset = SynthDataset(args.dataset_dir, max_duration=MAX_AUDIO_LENGTH, mono=args.mono)
+dataset = SynthDataset(
+    args.dataset_dir,
+    max_duration=MAX_AUDIO_LENGTH,
+    mono=args.mono,
+    input_freq=INPUT_FREQ,
+    output_freq=OUTPUT_FREQ,
+)
 writer = SummaryWriter()
 
 # mel_spectrogram_transform = torchaudio.transforms.MelSpectrogram(
