@@ -27,6 +27,14 @@ parser.add_argument(
     help="The path to the model",
 )
 
+parser.add_argument(
+    "--sampling_rate",
+    type=int,
+    required=False,
+    default=SAMPLING_RATE,
+    help="The sampling rate of the audio",
+)
+
 args = parser.parse_args()
 
 model = AutoEncoder1d(
@@ -73,7 +81,7 @@ def load(waveform_path):
     """
     waveform, sample_rate = torchaudio.load(waveform_path)
     resampler = torchaudio.transforms.Resample(
-        sample_rate, SAMPLING_RATE, dtype=waveform.dtype
+        sample_rate, args.sampling_rate, dtype=waveform.dtype
     )
     waveform = resampler(waveform)
     if waveform.shape[0] == 1:
@@ -90,8 +98,17 @@ output = torch.Tensor().cuda()
 model.eval()
 model.cuda()
 
-for i in range(0, audio.size(2), int(SAMPLING_RATE * MAX_AUDIO_LENGTH)):
-    chunk = audio[:, :, i : i + int(SAMPLING_RATE * MAX_AUDIO_LENGTH)]
+for i in range(0, audio.size(2), int(args.sampling_rate * MAX_AUDIO_LENGTH)):
+    chunk = audio[:, :, i : i + int(args.sampling_rate * MAX_AUDIO_LENGTH)]
+
+    if chunk.size(2) < int(args.sampling_rate * MAX_AUDIO_LENGTH):
+        chunk = torch.nn.functional.pad(
+            chunk,
+            (0, int(args.sampling_rate * MAX_AUDIO_LENGTH) - chunk.size(2)),
+            "constant",
+            0,
+        )
+
     with torch.no_grad():
         output = torch.cat([output, model(chunk)], dim=2)
 
@@ -101,5 +118,5 @@ output = output.squeeze(0)
 output = output.detach().cpu()
 audio = audio.squeeze(0).detach().cpu()
 
-torchaudio.save("./data/input.mp3", audio.T, SAMPLING_RATE, channels_first=False)
-torchaudio.save("./data/output.mp3", output.T, 32000, channels_first=False)
+torchaudio.save("./data/input.mp3", audio.T, args.sampling_rate, channels_first=False)
+torchaudio.save("./data/output.mp3", output.T, args.sampling_rate, channels_first=False)
