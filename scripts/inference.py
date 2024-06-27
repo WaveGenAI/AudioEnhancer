@@ -39,8 +39,20 @@ model = AutoEncoder1d(
         12,
         16,
     ],  # Channel multiplier between layers (i.e. channels * multiplier[i] -> channels * multiplier[i+1])
-    factors=[2, 4, 4, 8,],  # Downsampling/upsampling factor per layer
-    num_blocks=[2, 2, 2, 2,],  # Number of resnet blocks per layer
+    factors=[
+        2,
+        4,
+        4,
+        8,
+    ],  # Downsampling/upsampling factor per layer
+    num_blocks=[
+        1,
+        1,
+        1,
+        1,
+    ],  # Number of resnet blocks per layer
+    patch_size=1,
+    resnet_groups=1,
 )
 
 model.load_state_dict(torch.load(args.model_path))

@@ -72,7 +72,7 @@ writer = SummaryWriter()
 #     target = mel_spectrogram_transform(target)
 #     return MSELoss()(logits, target) / 10
 
-loss_fn = [MSELoss(), auraloss.time.LogCoshLoss()]
+loss_fn = [MSELoss()]
 disc_loss_fn = MSELoss()
 
 # split test and train
@@ -112,6 +112,8 @@ model = AutoEncoder1d(
         1,
         1,
     ],  # Number of resnet blocks per layer
+    patch_size=1,
+    resnet_groups=1,
 )
 
 # model = SoundStream(D=32, C=64, strides=(2, 4, 5, 8), residual=True)

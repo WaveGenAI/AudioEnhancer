@@ -12,7 +12,7 @@ Convolutional Modules
 
 
 def downsample1d(
-        in_channels: int, out_channels: int, factor: int, kernel_multiplier: int = 2
+    in_channels: int, out_channels: int, factor: int, kernel_multiplier: int = 2
 ) -> nn.Module:
     """
     Creates a 1D convolutional layer for downsampling.
@@ -77,17 +77,18 @@ class ConvBlock1d(nn.Module):
         num_groups (int, optional): Number of groups for the group normalization. Defaults to 8.
         use_norm (bool, optional): Whether to use normalization. Defaults to True.
     """
+
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            *,
-            kernel_size: int = 3,
-            stride: int = 1,
-            padding: int = 1,
-            dilation: int = 1,
-            num_groups: int = 8,
-            use_norm: bool = True,
+        self,
+        in_channels: int,
+        out_channels: int,
+        *,
+        kernel_size: int = 3,
+        stride: int = 1,
+        padding: int = 1,
+        dilation: int = 1,
+        num_groups: int = 8,
+        use_norm: bool = False,
     ) -> None:
         super().__init__()
 
@@ -114,16 +115,16 @@ class ConvBlock1d(nn.Module):
 
 class ResnetBlock1d(nn.Module):
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            *,
-            kernel_size: int = 3,
-            stride: int = 1,
-            padding: int = 1,
-            dilation: int = 1,
-            use_norm: bool = True,
-            num_groups: int = 8,
+        self,
+        in_channels: int,
+        out_channels: int,
+        *,
+        kernel_size: int = 3,
+        stride: int = 1,
+        padding: int = 1,
+        dilation: int = 1,
+        use_norm: bool = False,
+        num_groups: int = 8,
     ) -> None:
         super().__init__()
 
@@ -197,13 +198,13 @@ class Unpatcher(nn.Module):
 
 class DownsampleBlock1d(nn.Module):
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            *,
-            factor: int,
-            num_groups: int,
-            num_layers: int,
+        self,
+        in_channels: int,
+        out_channels: int,
+        *,
+        factor: int,
+        num_groups: int,
+        num_layers: int,
     ):
         super().__init__()
 
@@ -231,13 +232,13 @@ class DownsampleBlock1d(nn.Module):
 
 class UpsampleBlock1d(nn.Module):
     def __init__(
-            self,
-            in_channels: int,
-            out_channels: int,
-            *,
-            factor: int,
-            num_layers: int,
-            num_groups: int,
+        self,
+        in_channels: int,
+        out_channels: int,
+        *,
+        factor: int,
+        num_layers: int,
+        num_groups: int,
     ):
         super().__init__()
 
@@ -270,7 +271,7 @@ Encoders / Decoders
 
 class Bottleneck(nn.Module):
     def forward(
-            self, x: Tensor, with_info: bool = False
+        self, x: Tensor, with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Any]]:
         raise NotImplementedError()
 
@@ -288,7 +289,7 @@ def gaussian_sample(mean: Tensor, logvar: Tensor) -> Tensor:
 
 
 def kl_loss(mean: Tensor, logvar: Tensor) -> Tensor:
-    losses = mean ** 2 + logvar.exp() - logvar - 1
+    losses = mean**2 + logvar.exp() - logvar - 1
     loss = reduce(losses, "b ... -> 1", "mean").item()
     return loss
 
@@ -304,7 +305,7 @@ class VariationalBottleneck(Bottleneck):
         )
 
     def forward(
-            self, x: Tensor, with_info: bool = False
+        self, x: Tensor, with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Any]]:
         mean_and_std = self.to_mean_and_std(x)
         mean, std = mean_and_std.chunk(chunks=2, dim=1)
@@ -321,7 +322,7 @@ class VariationalBottleneck(Bottleneck):
 
 class TanhBottleneck(Bottleneck):
     def forward(
-            self, x: Tensor, with_info: bool = False
+        self, x: Tensor, with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Any]]:
         x = torch.tanh(x)
         info: Dict = dict()
@@ -334,7 +335,7 @@ class NoiserBottleneck(Bottleneck):
         self.sigma = sigma
 
     def forward(
-            self, x: Tensor, with_info: bool = False
+        self, x: Tensor, with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Any]]:
         if self.training:
             x = torch.randn_like(x) * self.sigma + x

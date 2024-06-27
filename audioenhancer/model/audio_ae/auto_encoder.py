@@ -1,4 +1,5 @@
 """This module contains all the auto-encoder models for audio data."""
+
 from math import floor
 from typing import Any, Optional, Sequence, Tuple, Union, List, Dict
 
@@ -12,7 +13,12 @@ from einops import pack, rearrange, unpack
 
 from audioenhancer.model.audio_ae.latent import LatentProcessor
 from audioenhancer.model.audio_ae.modules import Bottleneck
-from audioenhancer.model.audio_ae.utils import prefix_dict, default, groupby, closest_power_2
+from audioenhancer.model.audio_ae.utils import (
+    prefix_dict,
+    default,
+    groupby,
+    closest_power_2,
+)
 from audioenhancer.model.audio_ae.encoder import Encoder1d
 from audioenhancer.model.audio_ae.decoder import Decoder1d
 
@@ -63,10 +69,8 @@ class AutoEncoder1d(nn.Module):
         self, x: Tensor, with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Any]]:
         z, info_encoder = self.encode(x, with_info=True)
-        z = z.permute(0, 2, 1)
-        z = self.latent(z)
-        z = z.permute(0, 2, 1)
-        y, info_decoder = self.decode(z, info_encoder['xs'], with_info=True)
+
+        y, info_decoder = self.decode(z, info_encoder["xs"], with_info=True)
         info = {
             **dict(latent=z),
             **prefix_dict("encoder_", info_encoder),
@@ -79,7 +83,9 @@ class AutoEncoder1d(nn.Module):
     ) -> Union[Tensor, Tuple[Tensor, Any]]:
         return self.encoder(x, with_info=with_info)
 
-    def decode(self, x: Tensor, encoder_info: List[Tensor], with_info: bool = False) -> Tensor:
+    def decode(
+        self, x: Tensor, encoder_info: List[Tensor], with_info: bool = False
+    ) -> Tensor:
         return self.decoder(x, encoder_info, with_info=with_info)
 
 
