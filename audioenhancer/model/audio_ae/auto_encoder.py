@@ -46,7 +46,7 @@ class AutoEncoder1d(nn.Module):
             bottleneck=bottleneck,
         )
 
-        self.latent = LatentProcessor(512, 6)
+        self.latent = LatentProcessor(512, 8)
 
         self.decoder = Decoder1d(
             in_channels=bottleneck_channels,

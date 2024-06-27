@@ -2,6 +2,7 @@ from typing import Any, Dict, Tuple, Union
 
 import torch
 import torch.nn as nn
+from torch.nn import functional as F
 from einops import rearrange, reduce
 from torch import Tensor
 
@@ -217,14 +218,14 @@ class DownsampleBlock1d(nn.Module):
                     out_channels=out_channels,
                     num_groups=num_groups,
                 )
-                for i in range(num_layers)
+                for _ in range(num_layers)
             ]
         )
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.downsample(x)
         for block in self.blocks:
-            x = block(x)
+            x = block(F.relu(x))
         return x
 
 
@@ -257,7 +258,7 @@ class UpsampleBlock1d(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         for block in self.blocks:
-            x = block(x)
+            x = F.relu(block(x))
         x = self.upsample(x)
         return x
 
