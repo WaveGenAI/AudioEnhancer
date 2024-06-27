@@ -53,7 +53,7 @@ class EncoderBlock(nn.Module):
 class Encoder(nn.Module):
     """Encoder"""
 
-    def __init__(self, C, D, strides=(2, 4, 5, 8)):
+    def __init__(self, C, D, strides=(2, 4, 5, 8), residual: bool = False):
         """
         The Encoder is composed of a series of EncoderBlock layers followed by a convolutional layer.
         It compresses the audio signal.
@@ -62,6 +62,7 @@ class Encoder(nn.Module):
             C (int): The number of channels
             D (int): The latent space dimension
             strides (tuple, optional): The strides of the convolutional layers. Defaults to (2, 4, 5, 8).
+            residual (bool, optional): Whether to use residual connections. Defaults to False.
         """
         super().__init__()
 
@@ -86,12 +87,15 @@ class Encoder(nn.Module):
             ),
         )
 
+        self.residual = residual
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """Forward pass"""
 
         skips = []
         for layer in self.layers:
-            skips.append(x)
+            if self.residual:
+                skips.append(x)
             x = layer(x)
 
         return x, skips

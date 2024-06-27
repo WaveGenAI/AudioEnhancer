@@ -8,7 +8,6 @@ import os
 import auraloss
 import bitsandbytes as bnb
 import torch
-
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
@@ -90,6 +89,7 @@ test_loader = torch.utils.data.DataLoader(
     test_dataset, batch_size=BATCH_SIZE, shuffle=False
 )
 
+
 model = AutoEncoder1d(
     in_channels=2,  # Number of input channels
     channels=32,  # Number of base channels
@@ -100,9 +100,21 @@ model = AutoEncoder1d(
         12,
         16,
     ],  # Channel multiplier between layers (i.e. channels * multiplier[i] -> channels * multiplier[i+1])
-    factors=[2, 4, 4, 8,],  # Downsampling/upsampling factor per layer
-    num_blocks=[2, 2, 2, 2,],  # Number of resnet blocks per layer
+    factors=[
+        2,
+        4,
+        4,
+        8,
+    ],  # Downsampling/upsampling factor per layer
+    num_blocks=[
+        1,
+        1,
+        1,
+        1,
+    ],  # Number of resnet blocks per layer
 )
+
+# model = SoundStream(D=32, C=64, strides=(2, 4, 5, 8), residual=True)
 
 # discriminator = Discriminator(
 #     latent_dim=512,
@@ -163,7 +175,7 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
-        y_hat = model(x)
+        y_hat = model(y)
         loss = sum(loss(y_hat, y) for loss in loss_fn)
         loss.backward()
 

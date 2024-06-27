@@ -44,7 +44,7 @@ class DecoderBlock(nn.Module):
 class Decoder(nn.Module):
     """Decoder"""
 
-    def __init__(self, C, D, strides=(2, 4, 5, 8)):
+    def __init__(self, C, D, strides=(2, 4, 5, 8), residual: bool = False):
         """
         The Decoder is composed of a series of DecoderBlock layers followed by a convolutional layer.
         It decompresses the audio signal.
@@ -53,6 +53,7 @@ class Decoder(nn.Module):
             C (int): The number of channels
             D (int): The latent space dimension
             strides (tuple, optional): The strides of the convolutional layers. Defaults to (2, 4, 5, 8).
+            residual (bool, optional): Whether to use residual connections. Defaults to False.
         """
         super().__init__()
 
@@ -77,11 +78,24 @@ class Decoder(nn.Module):
             ),
         )
 
-    def forward(self, x: torch.Tensor, skips: List[torch.Tensor]) -> torch.Tensor:
-        """Forward pass"""
+        self.residual = residual
 
-        for skip, layer in zip(reversed(skips), self.layers):
+    def forward(self, x: torch.Tensor, skips: List[torch.Tensor]) -> torch.Tensor:
+        """Forward pass to decode the latent space.
+
+        Args:
+            x (torch.Tensor): The latent space
+            skips (List[torch.Tensor]): The skip connections from the encoder
+
+        Returns:
+            torch.Tensor: The decoded waveform
+        """
+        skips = skips[::-1]
+
+        for i, layer in enumerate(self.layers):
             x = layer(x)
-            x = x + skip
+
+            if self.residual:
+                x = x + skips[i]
 
         return x
