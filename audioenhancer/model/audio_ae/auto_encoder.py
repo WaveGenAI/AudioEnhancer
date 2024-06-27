@@ -52,7 +52,7 @@ class AutoEncoder1d(nn.Module):
             bottleneck=bottleneck,
         )
 
-        self.latent = LatentProcessor(512, 8)
+        # self.latent = LatentProcessor(512, 8)
 
         self.decoder = Decoder1d(
             in_channels=bottleneck_channels,
@@ -69,7 +69,9 @@ class AutoEncoder1d(nn.Module):
         self, x: Tensor, with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Any]]:
         z, info_encoder = self.encode(x, with_info=True)
-
+        # z = z.permute(0, 2, 1)
+        # z = self.latent(z)
+        # z = z.permute(0, 2, 1)
         y, info_decoder = self.decode(z, info_encoder["xs"], with_info=True)
         info = {
             **dict(latent=z),
@@ -121,7 +123,6 @@ class STFT(nn.Module):
             return_complex=True,
             normalized=True,
         )
-
         if self.use_complex:
             # Returns real and imaginary
             stft_a, stft_b = stft.real, stft.imag
@@ -207,10 +208,10 @@ class MAE1d(AutoEncoder1d):
         return super().encode(log_magnitude_flat, **kwargs)
 
     def decode(  # type: ignore
-        self, latent: Tensor, with_info: bool = False
+        self, latent: Tensor, encoder_info: List[Tensor], with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Dict]]:
         f = self.frequency_channels
-        log_magnitude_flat, info = super().decode(latent, with_info=True)
+        log_magnitude_flat, info = super().decode(latent, encoder_info, with_info=True)
         log_magnitude = rearrange(log_magnitude_flat, "b (c f) l -> b c f l", f=f)
         log_magnitude = torch.clamp(log_magnitude, -30.0, 20.0)
         magnitude = torch.exp(log_magnitude)
@@ -220,7 +221,11 @@ class MAE1d(AutoEncoder1d):
     def loss(
         self, wave: Tensor, with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Dict]]:
+        if wave.dtype != torch.float32:
+            original_dtype = wave.dtype
+            wave = wave.to(torch.float32)
         magnitude, _ = self.stft.encode(wave)
+        magnitude = magnitude.to(original_dtype) if original_dtype is not None else magnitude
         magnitude_pred, info = self(magnitude, with_info=True)
         loss = F.l1_loss(torch.log(magnitude), torch.log(magnitude_pred))
         return (loss, info) if with_info else loss

@@ -23,7 +23,7 @@ parser.add_argument(
     "--model_path",
     type=str,
     required=False,
-    default="data/model/model_2000.pt",
+    default="data/model/model_4000.pt",
     help="The path to the model",
 )
 
@@ -35,21 +35,27 @@ model = AutoEncoder1d(
     multipliers=[
         2,
         4,
+        6,
         8,
+        10,
         12,
         16,
     ],  # Channel multiplier between layers (i.e. channels * multiplier[i] -> channels * multiplier[i+1])
     factors=[
+        1,
         2,
-        4,
-        4,
-        8,
+        2,
+        2,
+        2,
+        2,
     ],  # Downsampling/upsampling factor per layer
     num_blocks=[
-        1,
-        1,
-        1,
-        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
     ],  # Number of resnet blocks per layer
     patch_size=1,
     resnet_groups=1,
@@ -96,4 +102,4 @@ output = output.detach().cpu()
 audio = audio.squeeze(0).detach().cpu()
 
 torchaudio.save("./data/input.mp3", audio.T, SAMPLING_RATE, channels_first=False)
-torchaudio.save("./data/output.mp3", output.T, SAMPLING_RATE, channels_first=False)
+torchaudio.save("./data/output.mp3", output.T, 32000, channels_first=False)

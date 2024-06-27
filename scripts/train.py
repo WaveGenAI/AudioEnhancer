@@ -49,6 +49,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 dtype = torch.bfloat16
+torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
+torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
 
 # Load the dataset
 dataset = SynthDataset(args.dataset_dir, max_duration=MAX_AUDIO_LENGTH, mono=args.mono)
@@ -59,9 +61,7 @@ writer = SummaryWriter()
 #     n_mels=128,
 #     n_fft=1024,
 #     normalized=True,
-# )
-#
-#
+# ).requires_grad_(False)
 # def mel_loss(logits, target):
 #     """
 #     Compute the MSE loss between the mel spectrogram of the logits and the target.
@@ -89,28 +89,33 @@ test_loader = torch.utils.data.DataLoader(
     test_dataset, batch_size=BATCH_SIZE, shuffle=False
 )
 
-
 model = AutoEncoder1d(
     in_channels=2,  # Number of input channels
     channels=32,  # Number of base channels
     multipliers=[
         2,
         4,
+        6,
         8,
+        10,
         12,
         16,
     ],  # Channel multiplier between layers (i.e. channels * multiplier[i] -> channels * multiplier[i+1])
     factors=[
+        1,
         2,
-        4,
-        4,
-        8,
+        2,
+        2,
+        2,
+        2,
     ],  # Downsampling/upsampling factor per layer
     num_blocks=[
-        1,
-        1,
-        1,
-        1,
+        2,
+        2,
+        2,
+        2,
+        2,
+        2,
     ],  # Number of resnet blocks per layer
     patch_size=1,
     resnet_groups=1,
@@ -153,7 +158,7 @@ optimizer = bnb.optim.AdamW8bit(
 scheduler = lr_scheduler.LinearLR(
     optimizer,
     start_factor=1,
-    end_factor=1e-6,
+    end_factor=1e-8,
     total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 )
 
@@ -177,8 +182,10 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
+        up_y = batch[2].to(device, dtype=dtype)
+
         y_hat = model(y)
-        loss = sum(loss(y_hat, y) for loss in loss_fn)
+        loss = sum(loss(y_hat, up_y) for loss in loss_fn)
         loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
@@ -240,8 +247,10 @@ for epoch in range(EPOCH):
         for batch in test_loader:
             x = batch[0].to(device, dtype=dtype)
             y = batch[1].to(device, dtype=dtype)
+            up_y = batch[2].to(device, dtype=dtype)
 
-            y_hat = model(x)
+            y_hat = model(y)
+            loss = sum(loss(y_hat, up_y) for loss in loss_fn)
             # batch_disc = torch.cat([y, y_hat], dim=0)
             # disc_pred = discriminator(batch_disc)
             # disc_pred = torch.sigmoid(disc_pred).squeeze()
@@ -249,8 +258,6 @@ for epoch in range(EPOCH):
             # disc_loss = disc_loss_fn(
             #     disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
             # )
-
-            loss = sum(loss(y_hat, y) for loss in loss_fn)
 
             loss_test += loss.item()
             # loss_desc_test += disc_loss.item()

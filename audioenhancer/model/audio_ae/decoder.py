@@ -47,8 +47,16 @@ class Decoder1d(nn.Module):
             ]
         )
 
-        self.to_out = Unpatcher(
+        self.upsample = UpsampleBlock1d(
             in_channels=channels * multipliers[-1],
+            out_channels=out_channels * 2,
+            factor=2,
+            num_groups=resnet_groups,
+            num_layers=2,
+        )
+
+        self.to_out = Unpatcher(
+            in_channels=out_channels * 2,
             out_channels=out_channels,
             patch_size=patch_size,
         )
@@ -67,6 +75,7 @@ class Decoder1d(nn.Module):
             xs += [x]
 
         x = x + encoder_info[-1]
+        x = self.upsample(x)
         x = self.to_out(x)
         xs += [x]
 

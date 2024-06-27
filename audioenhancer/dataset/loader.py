@@ -9,7 +9,7 @@ import torch
 import torchaudio
 from torch.utils.data import Dataset
 
-from audioenhancer.constants import SAMPLING_RATE
+from audioenhancer.constants import SAMPLING_RATE, UPSAMPLE_RATE
 
 
 class SynthDataset(Dataset):
@@ -38,7 +38,7 @@ class SynthDataset(Dataset):
             if os.path.isdir(f)
         ]
 
-        self._pad_length = max_duration * SAMPLING_RATE
+        self._pad_length = int(max_duration * SAMPLING_RATE)
         self._mono = mono
 
     def __len__(self) -> int:
@@ -68,12 +68,16 @@ class SynthDataset(Dataset):
         base_file = self.filenames[base_idx]
         compressed_file = os.path.join(codec, os.path.basename(base_file))
 
-        base_waveform, sample_rate = torchaudio.load(base_file)
+        original_waveform, sample_rate = torchaudio.load(base_file)
         compressed_waveform, compress_sr = torchaudio.load(compressed_file)
 
         base_waveform = torchaudio.transforms.Resample(
-            sample_rate, SAMPLING_RATE, dtype=base_waveform.dtype
-        )(base_waveform)
+            sample_rate, SAMPLING_RATE, dtype=original_waveform.dtype
+        )(original_waveform)
+
+        upsample_base = torchaudio.transforms.Resample(
+            sample_rate, UPSAMPLE_RATE, dtype=original_waveform.dtype
+        )(original_waveform)
 
         compressed_waveform = torchaudio.transforms.Resample(
             compress_sr, SAMPLING_RATE, dtype=compressed_waveform.dtype
@@ -88,6 +92,8 @@ class SynthDataset(Dataset):
                 base_waveform = base_waveform.repeat(2, 1)
             if compressed_waveform.shape[0] == 1:
                 compressed_waveform = compressed_waveform.repeat(2, 1)
+            if upsample_base.shape[0] == 1:
+                upsample_base = upsample_base.repeat(2, 1)
 
         if base_waveform.shape[-1] < self._pad_length:
             base_waveform = torch.nn.functional.pad(
@@ -108,4 +114,15 @@ class SynthDataset(Dataset):
             )
         else:
             compressed_waveform = compressed_waveform[:, : self._pad_length]
-        return compressed_waveform, base_waveform
+        up_pad_length = self._pad_length * UPSAMPLE_RATE // SAMPLING_RATE
+        if upsample_base.shape[-1] < up_pad_length:
+            upsample_base = torch.nn.functional.pad(
+                upsample_base,
+                (0, up_pad_length - upsample_base.shape[-1]),
+                "constant",
+                0,
+            )
+        else:
+            upsample_base = upsample_base[:, : up_pad_length]
+
+        return compressed_waveform, base_waveform, upsample_base
