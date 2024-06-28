@@ -6,9 +6,10 @@ import argparse
 
 import torch
 import torchaudio
+from audio_diffusion_pytorch import DiffusionModel, UNetV0, VSampler
 
-from audioenhancer.constants import SAMPLING_RATE, MAX_AUDIO_LENGTH
-from audioenhancer.model.audio_ae.auto_encoder import AutoEncoder1d
+from audioenhancer.constants import MAX_AUDIO_LENGTH, SAMPLING_RATE
+from audioenhancer.model.audio_ae.test import CustomVDiffusion
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -37,32 +38,49 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-model = AutoEncoder1d(
-    in_channels=2,  # Number of input channels
-    channels=32,  # Number of base channels
-    multipliers=[
-        2,
-        4,
-        8,
-        12,
-        16,
-    ],  # Channel multiplier between layers (i.e. channels * multiplier[i] -> channels * multiplier[i+1])
-    factors=[
-        2,
-        4,
-        4,
-        8,
-    ],  # Downsampling/upsampling factor per layer
-    num_blocks=[
-        1,
-        1,
-        1,
-        1,
-    ],  # Number of resnet blocks per layer
-    patch_size=1,
-    resnet_groups=1,
-)
 
+model = DiffusionModel(
+    net_t=UNetV0,  # The model type used for diffusion (U-Net V0 in this case)
+    in_channels=2,  # U-Net: number of input/output (audio) channels
+    channels=[
+        8,
+        32,
+        64,
+        128,
+        256,
+        512,
+        512,
+        1024,
+        1024,
+    ],  # U-Net: channels at each layer
+    factors=[
+        1,
+        4,
+        4,
+        4,
+        2,
+        2,
+        2,
+        2,
+        2,
+    ],  # U-Net: downsampling and upsampling factors at each layer
+    items=[1, 2, 2, 2, 2, 2, 2, 4, 4],  # U-Net: number of repeating items at each layer
+    attentions=[
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        1,
+        1,
+    ],  # U-Net: attention enabled/disabled at each layer
+    attention_heads=8,  # U-Net: number of attention heads per attention item
+    attention_features=64,  # U-Net: number of attention features per attention item
+    diffusion_t=CustomVDiffusion,  # The diffusion method used
+    sampler_t=VSampler,  # The diffusion sampler used
+)
 model.load_state_dict(torch.load(args.model_path))
 
 
@@ -86,25 +104,32 @@ def load(waveform_path):
     return waveform
 
 
-audio = load(args.audio).cuda()
+device = torch.device("cuda")
 
-output = torch.Tensor().cuda()
+audio = load(args.audio)
+output = torch.Tensor()
+
+audio = audio.to(device)
+model = model.to(device)
+output = output.to(device)
+
 model.eval()
-model.cuda()
 
-for i in range(0, audio.size(2), int(args.sampling_rate * MAX_AUDIO_LENGTH)):
-    chunk = audio[:, :, i : i + int(args.sampling_rate * MAX_AUDIO_LENGTH)]
+CHUNCK_SIZE = 2**18
+for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
+    chunk = audio[:, :, i : i + int(CHUNCK_SIZE)]
 
-    if chunk.size(2) < int(args.sampling_rate * MAX_AUDIO_LENGTH):
+    if chunk.size(2) < int(CHUNCK_SIZE):
         chunk = torch.nn.functional.pad(
             chunk,
-            (0, int(args.sampling_rate * MAX_AUDIO_LENGTH) - chunk.size(2)),
+            (0, int(CHUNCK_SIZE) - chunk.size(2)),
             "constant",
             0,
         )
 
     with torch.no_grad():
-        output = torch.cat([output, model(chunk)], dim=2)
+        pred = model.sample(chunk, num_steps=20)
+        output = torch.cat([output, pred], dim=2)
 
 output = output.squeeze(0)
 

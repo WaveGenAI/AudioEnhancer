@@ -115,4 +115,4 @@ class SynthDataset(Dataset):
             )
         else:
             compressed_waveform = compressed_waveform[:, : self._pad_length_input]
-        return compressed_waveform, base_waveform
+        return compressed_waveform[:, : 2**18], base_waveform[:, : 2**18]

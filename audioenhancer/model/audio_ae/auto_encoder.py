@@ -40,44 +40,13 @@ class AutoEncoder1d(nn.Module):
         super().__init__()
         out_channels = default(out_channels, in_channels)
 
-        self.encoder = Encoder1d(
-            in_channels=in_channels,
-            out_channels=bottleneck_channels,
-            channels=channels,
-            multipliers=multipliers,
-            factors=factors,
-            num_blocks=num_blocks,
-            patch_size=patch_size,
-            resnet_groups=resnet_groups,
-            bottleneck=bottleneck,
-        )
-
-        self.latent = LatentProcessor(512, 8)
-
-        self.decoder = Decoder1d(
-            in_channels=bottleneck_channels,
-            out_channels=out_channels,
-            channels=channels,
-            multipliers=multipliers[::-1],
-            factors=factors[::-1],
-            num_blocks=num_blocks[::-1],
-            patch_size=patch_size,
-            resnet_groups=resnet_groups,
-        )
+        self.latent = LatentProcessor(128, 2)
 
     def forward(
         self, x: Tensor, with_info: bool = False
     ) -> Union[Tensor, Tuple[Tensor, Any]]:
-        z, info_encoder = self.encode(x, with_info=True)
 
-        y, info_decoder = self.decode(z, info_encoder["xs"], with_info=True)
-        info = {
-            **dict(latent=z),
-            **prefix_dict("encoder_", info_encoder),
-            **prefix_dict("decoder_", info_decoder),
-        }
-
-        return (y, info) if with_info else y
+        return x
 
     def encode(
         self, x: Tensor, with_info: bool = False
