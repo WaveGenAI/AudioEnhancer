@@ -8,7 +8,7 @@ import os
 import auraloss
 import bitsandbytes as bnb
 import torch
-from audio_diffusion_pytorch import DiffusionModel, UNetV0, VSampler
+from audio_diffusion_pytorch import DiffusionModel, UNetV0, VSampler, VDiffusion
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
@@ -24,7 +24,7 @@ from audioenhancer.constants import (
     SAVE_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
-from audioenhancer.model.audio_ae.test import CustomVDiffusion
+from audioenhancer.model.audio_ae.vdiffusion import CustomVDiffusion
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -100,47 +100,26 @@ test_loader = torch.utils.data.DataLoader(
 
 
 model = DiffusionModel(
-    net_t=UNetV0,  # The model type used for diffusion (U-Net V0 in this case)
-    in_channels=2,  # U-Net: number of input/output (audio) channels
-    channels=[
-        8,
-        32,
-        64,
-        128,
-        256,
-        512,
-        512,
-        1024,
-        1024,
-    ],  # U-Net: channels at each layer
+    net_t=UNetV0,
+    in_channels=2,  # U-Net: number of input channels
+    channels=[256, 512, 1024, 1024, 1024, 1024],  # U-Net: channels at each layer
+    # TODO: make this a parameter
     factors=[
-        1,
         4,
         4,
         4,
-        2,
-        2,
-        2,
-        2,
-        2,
+        4,
+        4,
+        4,
     ],  # U-Net: downsampling and upsampling factors at each layer
-    items=[1, 2, 2, 2, 2, 2, 2, 4, 4],  # U-Net: number of repeating items at each layer
-    attentions=[
-        0,
-        0,
-        0,
-        0,
-        0,
-        1,
-        1,
-        1,
-        1,
-    ],  # U-Net: attention enabled/disabled at each layer
+    items=[2, 2, 2, 2, 2, 2],  # U-Net: number of repeating items at each layer
+    attentions=[0, 0, 0, 1, 1, 1],  # U-Net: attention enabled/disabled at each layer
     attention_heads=8,  # U-Net: number of attention heads per attention item
     attention_features=64,  # U-Net: number of attention features per attention item
     diffusion_t=CustomVDiffusion,  # The diffusion method used
     sampler_t=VSampler,  # The diffusion sampler used
 )
+
 
 # model = SoundStream(D=32, C=64, strides=(2, 4, 5, 8), residual=True)
 
@@ -205,7 +184,7 @@ for epoch in range(EPOCH):
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
 
-        loss = model(y, noise=x)
+        loss = model(x, y)
         loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)

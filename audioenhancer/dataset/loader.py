@@ -3,6 +3,7 @@ Module to load the audio dataset.
 """
 
 import glob
+import math
 import os
 
 import torch
@@ -43,8 +44,9 @@ class SynthDataset(Dataset):
             if os.path.isdir(f)
         ]
 
-        self._pad_length_input = max_duration * input_freq
-        self._pad_length_output = max_duration * output_freq
+        self._pad_length_input = math.ceil(math.log2(max_duration * input_freq))
+        self._pad_length_output = math.ceil(math.log2(max_duration * output_freq))
+
         self._mono = mono
         self._input_freq = input_freq
         self._output_freq = output_freq
@@ -103,8 +105,6 @@ class SynthDataset(Dataset):
                 "constant",
                 0,
             )
-        else:
-            base_waveform = base_waveform[:, : self._pad_length_output]
 
         if compressed_waveform.shape[-1] < self._pad_length_input:
             compressed_waveform = torch.nn.functional.pad(
@@ -113,6 +113,8 @@ class SynthDataset(Dataset):
                 "constant",
                 0,
             )
-        else:
-            compressed_waveform = compressed_waveform[:, : self._pad_length_input]
-        return compressed_waveform[:, : 2**18], base_waveform[:, : 2**18]
+
+        return (
+            compressed_waveform[:, : 2**self._pad_length_input],
+            base_waveform[:, : 2**self._pad_length_output],
+        )
