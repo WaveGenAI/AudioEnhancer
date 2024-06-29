@@ -3,13 +3,13 @@ Code for inference.
 """
 
 import argparse
+import math
 
 import torch
 import torchaudio
-from audio_diffusion_pytorch import DiffusionModel, UNetV0, VSampler
 
 from audioenhancer.constants import MAX_AUDIO_LENGTH, SAMPLING_RATE
-from audioenhancer.model.audio_ae.vdiffusion import CustomVDiffusion
+from audioenhancer.model.audio_ae.model import model as model
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -38,28 +38,8 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-
-model = DiffusionModel(
-    net_t=UNetV0,
-    in_channels=2,  # U-Net: number of input channels
-    channels=[256, 512, 1024, 1024, 1024, 1024],  # U-Net: channels at each layer
-    factors=[
-        4,
-        4,
-        4,
-        4,
-        4,
-        4,
-    ],  # U-Net: downsampling and upsampling factors at each layer
-    items=[2, 2, 2, 2, 2, 2],  # U-Net: number of repeating items at each layer
-    attentions=[0, 0, 0, 1, 1, 1],  # U-Net: attention enabled/disabled at each layer
-    attention_heads=8,  # U-Net: number of attention heads per attention item
-    attention_features=64,  # U-Net: number of attention features per attention item
-    diffusion_t=CustomVDiffusion,  # The diffusion method used
-    sampler_t=VSampler,  # The diffusion sampler used
-)
-
 model.load_state_dict(torch.load(args.model_path))
+CHUNCK_SIZE = 2 ** math.ceil(math.log2(MAX_AUDIO_LENGTH * args.sampling_rate))
 
 
 def load(waveform_path):
@@ -93,7 +73,6 @@ output = output.to(device)
 
 model.eval()
 
-CHUNCK_SIZE = 2**18
 for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
     chunk = audio[:, :, i : i + int(CHUNCK_SIZE)]
 
@@ -106,6 +85,7 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
         )
 
     with torch.no_grad():
+        print(f"Processing chunk {i}", end="\r")
         pred = model.sample(chunk, num_steps=20)
         output = torch.cat([output, pred], dim=2)
 
