@@ -91,24 +91,8 @@ class SynthDataset(Dataset):
         base_waveform = base_waveform.resample(self.autoencoder.sample_rate)
         compressed_waveform = compressed_waveform.resample(self.autoencoder.sample_rate)
 
-        if base_waveform.shape[-1] < self._pad_length_output:
-            base_waveform = torch.nn.functional.pad(
-                base_waveform,
-                (0, self._pad_length_output - base_waveform.shape[-1]),
-                "constant",
-                0,
-            )
-
-        if compressed_waveform.shape[-1] < self._pad_length_input:
-            compressed_waveform = torch.nn.functional.pad(
-                compressed_waveform,
-                (0, self._pad_length_input - compressed_waveform.shape[-1]),
-                "constant",
-                0,
-            )
-
-        compressed_waveform = compressed_waveform[:, : 2**self._pad_length_input]
-        base_waveform = base_waveform[:, : 2**self._pad_length_output]
+        compressed_waveform = compressed_waveform[:, :, : 2**self._pad_length_input]
+        base_waveform = base_waveform[:, :, : 2**self._pad_length_output]
 
         compressed_waveform = self.autoencoder.preprocess(
             compressed_waveform.audio_data, compressed_waveform.sample_rate
@@ -117,6 +101,18 @@ class SynthDataset(Dataset):
         base_waveform = self.autoencoder.preprocess(
             base_waveform.audio_data, base_waveform.sample_rate
         )
+
+        if base_waveform.shape[-1] < 2**self._pad_length_output:
+            base_waveform = torch.nn.functional.pad(
+                base_waveform,
+                (0, 2**self._pad_length_output - base_waveform.shape[-1]),
+            )
+
+        if compressed_waveform.shape[-1] < 2**self._pad_length_input:
+            compressed_waveform = torch.nn.functional.pad(
+                compressed_waveform,
+                (0, 2**self._pad_length_input - compressed_waveform.shape[-1]),
+            )
 
         compressed_waveform = compressed_waveform.transpose(0, 1).cuda()
         base_waveform = base_waveform.transpose(0, 1).cuda()
