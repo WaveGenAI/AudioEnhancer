@@ -112,12 +112,12 @@ model.to(device, dtype=dtype)
 # mel_spectrogram_transform.to(device)
 
 # add both models to optimizer
-optimizer = torch.optim.AdamW(
-    params=list(model.parameters()),
-    lr=1e-4,
-    betas=(0.95, 0.999),
-    eps=1e-6,
-    weight_decay=1e-3,
+optimizer = bnb.optim.AdamW8bit(
+    [
+        {"params": model.parameters()},
+    ],
+    lr=8e-5,
+    weight_decay=5e-5,
 )
 
 # disc_optimizer = bnb.optim.AdamW8bit(
@@ -161,11 +161,12 @@ for epoch in range(EPOCH):
         y = batch[1].to(device, dtype=dtype)
 
         # rearrange x and y
-        x = rearrange(x, "b c t -> b t c")
+        x = rearrange(x, "b c d t -> b t (c d)")
 
         y_hat = model(x)
 
-        y_hat = rearrange(y_hat, "b t c -> b c t", t=x.shape[1], c=x.shape[2], b=x.shape[0])
+        y_hat = rearrange(y_hat, "b t (c d) -> b c d t", c=2, d=9)
+
 
         loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
