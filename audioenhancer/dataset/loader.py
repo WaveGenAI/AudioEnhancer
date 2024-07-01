@@ -9,6 +9,7 @@ import os
 import torch
 import torchaudio
 from torch.utils.data import Dataset
+from archisound import ArchiSound
 
 
 class SynthDataset(Dataset):
@@ -50,6 +51,10 @@ class SynthDataset(Dataset):
         self._mono = mono
         self._input_freq = input_freq
         self._output_freq = output_freq
+
+        self.autoencoder = ArchiSound.from_pretrained("dmae1d-ATC32-v3")
+        self.autoencoder.eval()
+        self.autoencoder.requires_grad_(False)
 
     def __len__(self) -> int:
         """Returns the number of waveforms in the dataset.
@@ -114,7 +119,22 @@ class SynthDataset(Dataset):
                 0,
             )
 
+        compressed_waveform = compressed_waveform[:, : 2**self._pad_length_input]
+        base_waveform = base_waveform[:, : 2**self._pad_length_output]
+
+        # add batch dimension
+        compressed_waveform = compressed_waveform.unsqueeze(0)
+        base_waveform = base_waveform.unsqueeze(0)
+
+        encoded_compressed_waveform = self.autoencoder.encode(compressed_waveform) * 0.1
+
+        encoded_base_waveform = self.autoencoder.encode(base_waveform) * 0.1
+
+        # remove batch dimension
+        encoded_compressed_waveform = encoded_compressed_waveform.squeeze(0)
+        encoded_base_waveform = encoded_base_waveform.squeeze(0)
+
         return (
-            compressed_waveform[:, : 2**self._pad_length_input],
-            base_waveform[:, : 2**self._pad_length_output],
+            encoded_compressed_waveform,
+            encoded_base_waveform,
         )

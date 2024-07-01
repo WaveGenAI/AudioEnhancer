@@ -9,7 +9,11 @@ import torch
 import torchaudio
 
 from audioenhancer.constants import MAX_AUDIO_LENGTH, SAMPLING_RATE
-from audioenhancer.model.audio_ae.model import model as model
+from audioenhancer.model.audio_ae.model import model_xtransformer as model
+from archisound import ArchiSound
+
+from einops import rearrange
+import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -69,6 +73,10 @@ output = torch.Tensor()
 
 audio = audio.to(device)
 model = model.to(device)
+model.eval()
+autoencoder = ArchiSound.from_pretrained("dmae1d-ATC32-v3")
+autoencoder.to(device)
+
 output = output.to(device)
 
 model.eval()
@@ -86,8 +94,16 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
 
     with torch.no_grad():
         print(f"Processing chunk {i}", end="\r")
-        pred = model.sample(chunk, num_steps=20)
-        output = torch.cat([output, pred], dim=2)
+        encoded = autoencoder.encode(chunk) * 0.1
+
+        encoded = rearrange(encoded, "b c t -> b t c")
+        pred = model(encoded)
+
+        pred = rearrange(pred, "b t c -> b c t")
+
+        decodec = autoencoder.decode(pred / 0.1, num_steps=20)
+
+        output = torch.cat([output, decodec], dim=2)
 
 output = output.squeeze(0)
 
@@ -95,5 +111,5 @@ output = output.squeeze(0)
 output = output.detach().cpu()
 audio = audio.squeeze(0).detach().cpu()
 
-torchaudio.save("./data/input.mp3", audio.T, args.sampling_rate, channels_first=False)
+# torchaudio.save("./data/input.mp3", audio.T, args.sampling_rate, channels_first=False)
 torchaudio.save("./data/output.mp3", output.T, args.sampling_rate, channels_first=False)

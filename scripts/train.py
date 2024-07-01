@@ -10,6 +10,8 @@ import torch
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
+from audioenhancer.model.audio_ae.model import model_xtransformer as model
+from einops import rearrange
 
 from audioenhancer.constants import (
     BATCH_SIZE,
@@ -22,7 +24,6 @@ from audioenhancer.constants import (
     SAVE_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
-from audioenhancer.model.audio_ae.model import model as model
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -96,17 +97,6 @@ test_loader = torch.utils.data.DataLoader(
     test_dataset, batch_size=BATCH_SIZE, shuffle=False
 )
 
-# model = SoundStream(D=32, C=64, strides=(2, 4, 5, 8), residual=True)
-
-# discriminator = Discriminator(
-#     latent_dim=512,
-#     num_channels=64,
-#     strides=(2, 4, 4, 5),
-# )
-
-# if os.path.exists("data/model/disc.pt"):
-#     discriminator.load_state_dict(torch.load("data/model/disc.pt"))
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device {device}")
 model.to(device, dtype=dtype)
@@ -115,12 +105,12 @@ model.to(device, dtype=dtype)
 # mel_spectrogram_transform.to(device)
 
 # add both models to optimizer
-optimizer = bnb.optim.AdamW8bit(
-    [
-        {"params": model.parameters()},
-    ],
+optimizer = torch.optim.AdamW(
+    params=list(model.parameters()),
     lr=1e-4,
-    weight_decay=1e-5,
+    betas=(0.95, 0.999),
+    eps=1e-6,
+    weight_decay=1e-3,
 )
 
 # disc_optimizer = bnb.optim.AdamW8bit(
@@ -145,8 +135,10 @@ scheduler = lr_scheduler.LinearLR(
 #     total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 # )
 
+
 # print number of parameters
 print(f"Number of parameters: {sum(p.numel() for p in model.parameters()) / 1e6}M")
+
 
 step = 0
 logging_loss = 0
@@ -159,7 +151,15 @@ for epoch in range(EPOCH):
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
 
-        loss = model(x, y)
+        # rearrange x and y
+        x = rearrange(x, "b c t -> b t c")
+
+        y_hat = model(x, mask=None)
+
+        # rearrange y_hat and y
+        y_hat = rearrange(y_hat, "b t c -> b c t")
+
+        loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
@@ -175,18 +175,7 @@ for epoch in range(EPOCH):
         # loss += disc_pred[: -y.shape[0]].mean().squeeze()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 2)
-
-            # for name, param in discriminator.named_parameters():
-            #     if param.grad is not None:
-            #         param.grad /= GRADIENT_ACCUMULATION_STEPS
-            #
-            # disc_optimizer.step()
-            # disc_optimizer.zero_grad()
-            # disc_scheduler.step()
-            for name, param in model.named_parameters():
-                if param.grad is not None:
-                    param.grad /= GRADIENT_ACCUMULATION_STEPS
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
 
             optimizer.step()
             optimizer.zero_grad()
@@ -222,16 +211,7 @@ for epoch in range(EPOCH):
             x = batch[0].to(device, dtype=dtype)
             y = batch[1].to(device, dtype=dtype)
 
-            y_hat = model(x, y)
-            # batch_disc = torch.cat([y, y_hat], dim=0)
-            # disc_pred = discriminator(batch_disc)
-            # disc_pred = torch.sigmoid(disc_pred).squeeze()
-            # labels = [0] * y.shape[0] + [1] * y.shape[0]
-            # disc_loss = disc_loss_fn(
-            #     disc_pred, torch.Tensor(labels).to(device, dtype=dtype)
-            # )
-
-            loss = sum(loss(y_hat, y) for loss in loss_fn)
+            loss = model(x=x, y=y)
 
             loss_test += loss.item()
             # loss_desc_test += disc_loss.item()
