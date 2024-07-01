@@ -110,12 +110,23 @@ class SynthDataset(Dataset):
         compressed_waveform = compressed_waveform[:, : 2**self._pad_length_input]
         base_waveform = base_waveform[:, : 2**self._pad_length_output]
 
-        encoded_compressed_waveform = self.autoencoder.compress(
-            compressed_waveform
-        ).codes
-        encoded_base_waveform = self.autoencoder.compress(base_waveform).codes
+        compressed_waveform = self.autoencoder.preprocess(
+            compressed_waveform.audio_data, compressed_waveform.sample_rate
+        )
 
-        # convert to mono or stereo
+        base_waveform = self.autoencoder.preprocess(
+            base_waveform.audio_data, base_waveform.sample_rate
+        )
+
+        compressed_waveform = compressed_waveform.transpose(0, 1).cuda()
+        base_waveform = base_waveform.transpose(0, 1).cuda()
+
+        encoded_compressed_waveform, _, _, _, _ = self.autoencoder.encode(
+            compressed_waveform
+        )
+
+        encoded_base_waveform, _, _, _, _ = self.autoencoder.encode(base_waveform)
+
         if self._mono:
             encoded_compressed_waveform = encoded_compressed_waveform.mean(dim=1)
             encoded_base_waveform = encoded_base_waveform.mean(dim=1)

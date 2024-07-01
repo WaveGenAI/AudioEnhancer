@@ -155,9 +155,10 @@ for epoch in range(EPOCH):
 
         # rearrange x and y
         x = rearrange(x, "b c d t -> b t (c d)")
-        y = rearrange(y, "b c d t -> b t (c d)")
 
         y_hat = model(x, mask=None)
+
+        y_hat = rearrange(y_hat, "b t (c d) -> b c d t", c=2, d=9)
 
         loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
