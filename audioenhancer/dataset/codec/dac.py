@@ -19,7 +19,7 @@ class DAC(Codec):
             max_length (int, optional): the max length of an audio. Defaults to 30.
         """
 
-        model_path = dac.utils.download(model_type="16khz")
+        model_path = dac.utils.download(model_type="44khz")
         self._model = dac.DAC.load(model_path)
 
         self._device = torch.device("cpu")

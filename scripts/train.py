@@ -10,7 +10,6 @@ import torch
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
-from audioenhancer.model.audio_ae.model import model_xtransformer as model
 from einops import rearrange
 
 from audioenhancer.constants import (
@@ -24,6 +23,7 @@ from audioenhancer.constants import (
     SAVE_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
+from audioenhancer.model.audio_ae.latent import LatentProcessor
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -79,6 +79,13 @@ writer = SummaryWriter()
 #     logits = mel_spectrogram_transform(logits)
 #     target = mel_spectrogram_transform(target)
 #     return MSELoss()(logits, target) / 10
+
+model = LatentProcessor(
+    in_dim=1024,
+    out_dim=1024,
+    latent_dim=1024,
+    num_layers=6,
+)
 
 loss_fn = [MSELoss()]
 disc_loss_fn = MSELoss()
@@ -154,11 +161,11 @@ for epoch in range(EPOCH):
         y = batch[1].to(device, dtype=dtype)
 
         # rearrange x and y
-        x = rearrange(x, "b c d t -> b t (c d)")
+        x = rearrange(x, "b c t -> b t c")
 
-        y_hat = model(x, mask=None)
+        y_hat = model(x)
 
-        y_hat = rearrange(y_hat, "b t (c d) -> b c d t", c=2, d=9)
+        y_hat = rearrange(y_hat, "b t c -> b c t", t=x.shape[1], c=x.shape[2], b=x.shape[0])
 
         loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
