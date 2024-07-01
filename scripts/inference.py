@@ -5,15 +5,13 @@ Code for inference.
 import argparse
 import math
 
+import dac
 import torch
 import torchaudio
+from einops import rearrange
 
 from audioenhancer.constants import MAX_AUDIO_LENGTH, SAMPLING_RATE
 from audioenhancer.model.audio_ae.model import model_xtransformer as model
-from archisound import ArchiSound
-
-from einops import rearrange
-import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -42,9 +40,6 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-model.load_state_dict(torch.load(args.model_path))
-CHUNCK_SIZE = 2 ** math.ceil(math.log2(MAX_AUDIO_LENGTH * args.sampling_rate))
-
 
 def load(waveform_path):
     """
@@ -66,17 +61,23 @@ def load(waveform_path):
     return waveform
 
 
-device = torch.device("cuda")
+CHUNCK_SIZE = 2 ** math.ceil(math.log2(MAX_AUDIO_LENGTH * args.sampling_rate))
+model.load_state_dict(torch.load(args.model_path))
+model.eval()
+
+autoencoder_path = dac.utils.download(model_type="44khz")
+autoencoder = dac.DAC.load(autoencoder_path).to("cuda")
+
+output = torch.Tensor()
+input = torch.Tensor()
 
 audio = load(args.audio)
 output = torch.Tensor()
 ae_input = torch.Tensor()
 
+device = torch.device("cuda")
 audio = audio.to(device)
 model = model.to(device)
-model.eval()
-autoencoder = ArchiSound.from_pretrained("dmae1d-ATC32-v3")
-autoencoder.eval()
 autoencoder.to(device)
 
 output = output.to(device)
@@ -101,23 +102,42 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
 
     with torch.no_grad():
         print(f"Processing chunk {i}", end="\r")
-        encoded = autoencoder.encode(chunk)
 
-        encoded = rearrange(encoded, "b c t -> b t c")
-        pred = model(encoded)
+        encoded, _, _, _, _ = autoencoder.encode(chunk.transpose(0, 1))
 
-        pred = rearrange(pred, "b t c -> b c t")
+        # create input for the model
+        decoded = autoencoder.decode(encoded)
 
-        decodec = autoencoder.decode(pred, num_steps=40)
-        original = autoencoder.decode(encoded, num_steps=40)
+        decoded = decoded.transpose(0, 1)
 
-        output = torch.cat([output, decodec], dim=2)
+        input = torch.cat([input, decoded], dim=2)
 
-output = output.squeeze(0)
+        # create output for the model
+
+        encoded = encoded.unsqueeze(0)
+        encoded = rearrange(encoded, "b c d t -> b t (c d)")
+
+        pred = model(encoded, mask=None)
+
+        pred = rearrange(pred, "b t (c d) -> b c d t", c=2, d=1024)
+        pred = pred.squeeze(0)
+
+        decoded = autoencoder.decode(pred)
+
+        decoded = decoded.transpose(0, 1)
+
+        output = torch.cat([output, decoded], dim=2)
+
 
 # fix runtime error: numpy
-output = output.detach().cpu()
-audio = audio.squeeze(0).detach().cpu()
+output = output.squeeze(0).detach().cpu()
+input = input.squeeze(0).detach().cpu()
 
-torchaudio.save("./data/input.mp3", audio.T, args.sampling_rate, channels_first=False)
+
+torchaudio.save(
+    "./data/input.mp3",
+    input.T,
+    args.sampling_rate,
+    channels_first=False,
+)
 torchaudio.save("./data/output.mp3", output.T, args.sampling_rate, channels_first=False)
