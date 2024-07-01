@@ -21,6 +21,7 @@ from audioenhancer.constants import (
     MAX_AUDIO_LENGTH,
     OUTPUT_FREQ,
     SAVE_STEPS,
+    EVAL_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
 from audioenhancer.model.audio_ae.model import model_xtransformer as model
@@ -85,8 +86,9 @@ loss_fn = [MSELoss()]
 disc_loss_fn = MSELoss()
 
 # split test and train
-train_size = int(0.9 * len(dataset))
-test_size = len(dataset) - train_size
+test_size = min(len(dataset) * 0.1, 100)
+train_size = len(dataset) - test_size
+
 train_dataset, test_dataset = torch.utils.data.random_split(
     dataset, [train_size, test_size]
 )
@@ -94,9 +96,7 @@ train_dataset, test_dataset = torch.utils.data.random_split(
 train_loader = torch.utils.data.DataLoader(
     train_dataset, batch_size=BATCH_SIZE, shuffle=True
 )
-test_loader = torch.utils.data.DataLoader(
-    test_dataset, batch_size=BATCH_SIZE, shuffle=False
-)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using device {device}")
@@ -138,9 +138,42 @@ scheduler = lr_scheduler.LinearLR(
 #     total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 # )
 
+# xavier initialization
+
+for p in model.parameters():
+    if p.dim() > 1:
+        torch.nn.init.xavier_uniform_(p)
 
 # print number of parameters
 print(f"Number of parameters: {sum(p.numel() for p in model.parameters()) / 1e6}M")
+
+
+def eval_model(model, test_loader):
+    model.eval()
+    loss_test = 0
+
+    for batch in test_loader:
+        x = batch[0].to(device, dtype=dtype)
+        y = batch[1].to(device, dtype=dtype)
+        c, d = x.shape[1], x.shape[2]
+
+        # normalize x over the last dimension
+
+        mean_x = x.mean(dim=-1, keepdim=True)
+        std_x = x.std(dim=-1, keepdim=True)
+        x = (x - mean_x) / std_x
+
+        # rearrange x and y
+        x = rearrange(x, "b c d t -> b (t c) d")
+
+        y_hat = model(x, mask=None)
+
+        y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
+
+        loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
+        loss_test += loss.detach().cpu().float().numpy()
+
+    return loss_test / len(test_loader)
 
 
 step = 0
@@ -151,11 +184,15 @@ for epoch in range(EPOCH):
     for batch in train_loader:
         step += 1
 
-        x = batch[0].to(
-            device, dtype=dtype
-        )
+        x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
         c, d = x.shape[1], x.shape[2]
+
+        # normalize x over the last dimension
+
+        mean_x = x.mean(dim=-1, keepdim=True)
+        std_x = x.std(dim=-1, keepdim=True)
+        x = (x - mean_x) / std_x
 
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")
@@ -207,24 +244,11 @@ for epoch in range(EPOCH):
             torch.save(model.state_dict(), args.model_path + f"model_{step}.pt")
             # torch.save(discriminator.state_dict(), args.model_path + f"disc_{step}.pt")
 
-    model.eval()
+        if step % EVAL_STEPS == 0:
+            loss_test = eval_model(model, test_loader)
+            writer.add_scalar("Loss Test", loss_test, step)
+            print(f"Test Loss: {loss_test}")
 
-    loss_test = 0
-    # loss_desc_test = 0
-    with torch.no_grad():
-        for batch in test_loader:
-            x = batch[0].to(device, dtype=dtype)
-            y = batch[1].to(device, dtype=dtype)
-
-            loss = model(x=x, y=y)
-
-            loss_test += loss.item()
-            # loss_desc_test += disc_loss.item()
-
-    print(
-        f"Avg test Loss: {loss_test / len(test_loader)}"
-        # f" Desc Loss {loss_desc_test / len(test_loader)}"
-    )
 
 print("Training done")
 torch.save(model.state_dict(), args.model_path + "model.pt")
