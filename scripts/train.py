@@ -84,7 +84,7 @@ model = LatentProcessor(
     in_dim=1024,
     out_dim=1024,
     latent_dim=1024,
-    num_layers=6,
+    num_layer=6,
 )
 
 loss_fn = [MSELoss()]
