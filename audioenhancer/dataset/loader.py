@@ -6,10 +6,11 @@ import glob
 import math
 import os
 
+import dac
 import torch
 import torchaudio
+from audiotools import AudioSignal
 from torch.utils.data import Dataset
-from archisound import ArchiSound
 
 
 class SynthDataset(Dataset):
@@ -52,7 +53,8 @@ class SynthDataset(Dataset):
         self._input_freq = input_freq
         self._output_freq = output_freq
 
-        self.autoencoder = ArchiSound.from_pretrained("dmae1d-ATC32-v3")
+        model_path = dac.utils.download(model_type="44khz")
+        self.autoencoder = dac.DAC.load(model_path).to("cuda")
         self.autoencoder.eval()
         self.autoencoder.requires_grad_(False)
 
@@ -83,25 +85,11 @@ class SynthDataset(Dataset):
         base_file = self.filenames[base_idx]
         compressed_file = os.path.join(codec, os.path.basename(base_file))
 
-        base_waveform, sample_rate = torchaudio.load(base_file)
-        compressed_waveform, compress_sr = torchaudio.load(compressed_file)
+        base_waveform = AudioSignal(base_file)
+        compressed_waveform = AudioSignal(compressed_file)
 
-        base_waveform = torchaudio.transforms.Resample(
-            sample_rate, self._output_freq, dtype=base_waveform.dtype
-        )(base_waveform)
-
-        compressed_waveform = torchaudio.transforms.Resample(
-            compress_sr, self._input_freq, dtype=compressed_waveform.dtype
-        )(compressed_waveform)
-
-        if self._mono:
-            base_waveform = base_waveform.mean(dim=0, keepdim=True)
-            compressed_waveform = compressed_waveform.mean(dim=0, keepdim=True)
-        else:
-            if base_waveform.shape[0] == 1:
-                base_waveform = base_waveform.repeat(2, 1)
-            if compressed_waveform.shape[0] == 1:
-                compressed_waveform = compressed_waveform.repeat(2, 1)
+        base_waveform = base_waveform.resample(self.autoencoder.sample_rate)
+        compressed_waveform = compressed_waveform.resample(self.autoencoder.sample_rate)
 
         if base_waveform.shape[-1] < self._pad_length_output:
             base_waveform = torch.nn.functional.pad(
@@ -122,17 +110,23 @@ class SynthDataset(Dataset):
         compressed_waveform = compressed_waveform[:, : 2**self._pad_length_input]
         base_waveform = base_waveform[:, : 2**self._pad_length_output]
 
-        # add batch dimension
-        compressed_waveform = compressed_waveform.unsqueeze(0)
-        base_waveform = base_waveform.unsqueeze(0)
+        encoded_compressed_waveform = self.autoencoder.compress(
+            compressed_waveform
+        ).codes
+        encoded_base_waveform = self.autoencoder.compress(base_waveform).codes
 
-        encoded_compressed_waveform = self.autoencoder.encode(compressed_waveform) * 0.1
+        # convert to mono or stereo
+        if self._mono:
+            encoded_compressed_waveform = encoded_compressed_waveform.mean(dim=1)
+            encoded_base_waveform = encoded_base_waveform.mean(dim=1)
 
-        encoded_base_waveform = self.autoencoder.encode(base_waveform) * 0.1
-
-        # remove batch dimension
-        encoded_compressed_waveform = encoded_compressed_waveform.squeeze(0)
-        encoded_base_waveform = encoded_base_waveform.squeeze(0)
+        if not self._mono:
+            if encoded_compressed_waveform.shape[0] == 1:
+                encoded_compressed_waveform = encoded_compressed_waveform.repeat(
+                    2, 1, 1
+                )
+            if encoded_base_waveform.shape[0] == 1:
+                encoded_base_waveform = encoded_base_waveform.repeat(2, 1, 1)
 
         return (
             encoded_compressed_waveform,

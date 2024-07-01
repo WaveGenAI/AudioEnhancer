@@ -151,6 +151,8 @@ for epoch in range(EPOCH):
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
 
+        print(x.shape, y.shape)
+
         # rearrange x and y
         x = rearrange(x, "b c t -> b t c")
 
