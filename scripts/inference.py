@@ -115,11 +115,11 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
         # create output for the model
 
         encoded = encoded.unsqueeze(0)
-        encoded = rearrange(encoded, "b c d t -> b t (c d)")
+        encoded = rearrange(encoded,"b c d t -> b (t c) d")
 
         pred = model(encoded)
 
-        pred = rearrange(pred, "b t (c d) -> b c d t", c=2, d=1024)
+        pred = rearrange(pred, "b (t c) d -> b c d t", c=2, d=1024)
         pred = pred.squeeze(0)
 
         decoded = autoencoder.decode(pred)
@@ -131,12 +131,12 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
 
 # fix runtime error: numpy
 output = output.squeeze(0).detach().cpu()
-input = input.squeeze(0).detach().cpu()
+ae_input = ae_input.squeeze(0).detach().cpu()
 
 
 torchaudio.save(
     "./data/input.mp3",
-    input.T,
+    ae_input.T,
     args.sampling_rate,
     channels_first=False,
 )

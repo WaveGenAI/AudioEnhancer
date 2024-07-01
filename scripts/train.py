@@ -23,7 +23,7 @@ from audioenhancer.constants import (
     SAVE_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
-from audioenhancer.model.audio_ae.latent import LatentProcessor
+from audioenhancer.model.audio_ae.model import model_xtransformer as model
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -80,12 +80,6 @@ writer = SummaryWriter()
 #     target = mel_spectrogram_transform(target)
 #     return MSELoss()(logits, target) / 10
 
-model = LatentProcessor(
-    in_dim=1024,
-    out_dim=1024,
-    latent_dim=1024,
-    num_layer=6,
-)
 
 loss_fn = [MSELoss()]
 disc_loss_fn = MSELoss()
@@ -116,8 +110,10 @@ optimizer = bnb.optim.AdamW8bit(
     [
         {"params": model.parameters()},
     ],
-    lr=8e-5,
-    weight_decay=5e-5,
+    lr=1e-4,
+    betas=(0.95, 0.999),
+    eps=1e-6,
+    weight_decay=1e-3,
 )
 
 # disc_optimizer = bnb.optim.AdamW8bit(
@@ -157,17 +153,16 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(
             device, dtype=dtype
-        )  # [8, 2, 9, 1152] so [batch, channel, codebook, time]
+        )
         y = batch[1].to(device, dtype=dtype)
         c, d = x.shape[1], x.shape[2]
 
         # rearrange x and y
-        x = rearrange(x, "b c d t -> b t (c d)")
+        x = rearrange(x, "b c d t -> b (t c) d")
 
-        y_hat = model(x)
+        y_hat = model(x, mask=None)
 
-        y_hat = rearrange(y_hat, "b t (c d) -> b c d t", c=c, d=d)
-
+        y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 
         loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
@@ -197,7 +192,7 @@ for epoch in range(EPOCH):
             writer.add_scalar("LR", scheduler.get_last_lr()[0], step)
             print(
                 f"EPOCH {round(step/len(train_loader), 2)} "
-                f"({round((step % len(train_loader)) / (len(train_loader) * EPOCH) * 100, 2)}%) - "
+                f"({round(step / (len(train_loader) * EPOCH) * 100, 2)}%) - "
                 f"STEP {step}:"
                 f" Loss {round(logging_loss / LOGGING_STEPS, 4)}"
                 # f" Desc Loss {round(logging_desc_loss / LOGGING_STEPS, 4)}"
