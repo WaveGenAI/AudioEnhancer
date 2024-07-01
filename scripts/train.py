@@ -158,7 +158,7 @@ for epoch in range(EPOCH):
 
         y_hat = model(x, mask=None)
 
-        y_hat = rearrange(y_hat, "b t (c d) -> b c d t", c=2, d=9)
+        y_hat = rearrange(y_hat, "b t (c d) -> b c d t", c=2, d=1024)
 
         loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
