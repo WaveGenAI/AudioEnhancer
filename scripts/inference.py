@@ -109,7 +109,7 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
         encoded = encoded.unsqueeze(0)
         encoded = rearrange(encoded, "b c d t -> b t (c d)")
 
-        pred = model(encoded, mask=None)
+        pred = model(encoded)
 
         pred = rearrange(pred, "b t (c d) -> b c d t", c=2, d=1024)
         pred = pred.squeeze(0)

@@ -152,13 +152,14 @@ for epoch in range(EPOCH):
             device, dtype=dtype
         )  # [8, 2, 9, 1152] so [batch, channel, codebook, time]
         y = batch[1].to(device, dtype=dtype)
+        c, d = x.shape[1], x.shape[2]
 
         # rearrange x and y
         x = rearrange(x, "b c d t -> b t (c d)")
 
         y_hat = model(x, mask=None)
 
-        y_hat = rearrange(y_hat, "b t (c d) -> b c d t", c=2, d=1024)
+        y_hat = rearrange(y_hat, "b t (c d) -> b c d t", c=c, d=d)
 
         loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
