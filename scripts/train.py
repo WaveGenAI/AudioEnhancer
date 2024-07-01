@@ -148,18 +148,16 @@ for epoch in range(EPOCH):
     for batch in train_loader:
         step += 1
 
-        x = batch[0].to(device, dtype=dtype)
+        x = batch[0].to(
+            device, dtype=dtype
+        )  # [8, 2, 9, 1152] so [batch, channel, codebook, time]
         y = batch[1].to(device, dtype=dtype)
 
-        print(x.shape, y.shape)
-
         # rearrange x and y
-        x = rearrange(x, "b c t -> b t c")
+        x = rearrange(x, "b c d t -> b t (c d)")
+        y = rearrange(y, "b c d t -> b t (c d)")
 
         y_hat = model(x, mask=None)
-
-        # rearrange y_hat and y
-        y_hat = rearrange(y_hat, "b t c -> b c t")
 
         loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()

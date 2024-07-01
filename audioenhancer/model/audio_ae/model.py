@@ -161,8 +161,8 @@ model_ae = DiffusionAE(
 )
 
 model_xtransformer = ContinuousTransformerWrapper(
-    dim_in=32,
-    dim_out=32,
+    dim_in=18,
+    dim_out=18,
     max_seq_len=0,
     attn_layers=Encoder(
         dim=512,
