@@ -69,7 +69,6 @@ autoencoder_path = dac.utils.download(model_type="44khz")
 autoencoder = dac.DAC.load(autoencoder_path).to("cuda")
 
 output = torch.Tensor()
-input = torch.Tensor()
 
 audio = load(args.audio)
 output = torch.Tensor()
@@ -82,7 +81,6 @@ autoencoder.to(device)
 
 output = output.to(device)
 ae_input = ae_input.to(device)
-
 
 model.eval()
 
@@ -110,16 +108,17 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
 
         decoded = decoded.transpose(0, 1)
 
-        input = torch.cat([input, decoded], dim=2)
+        ae_input = torch.cat([ae_input, decoded], dim=2)
 
         # create output for the model
 
         encoded = encoded.unsqueeze(0)
-        encoded = rearrange(encoded,"b c d t -> b (t c) d")
+        c, d = encoded.shape[1], encoded.shape[2]
+        encoded = rearrange(encoded, "b c d t -> b (t c) d")
 
         pred = model(encoded)
 
-        pred = rearrange(pred, "b (t c) d -> b c d t", c=2, d=1024)
+        pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
         pred = pred.squeeze(0)
 
         decoded = autoencoder.decode(pred)
