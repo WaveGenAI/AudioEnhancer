@@ -68,8 +68,6 @@ model.eval()
 autoencoder_path = dac.utils.download(model_type="44khz")
 autoencoder = dac.DAC.load(autoencoder_path).to("cuda")
 
-output = torch.Tensor()
-
 audio = load(args.audio)
 output = torch.Tensor()
 ae_input = torch.Tensor()
