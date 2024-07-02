@@ -12,6 +12,9 @@ from pydub import AudioSegment
 from audioenhancer.dataset.codec import Codec
 
 
+SUPPORTED_EXTENSIONS = [".mp3", ".wav", ".flac"]
+
+
 class DatasetBuilder:
     """
     Class to generate the dataset.
@@ -58,7 +61,9 @@ class DatasetBuilder:
         print(f"Process {self._nbm_files_processed} files", end="\r")
 
         if total_duration <= (max_duration_ms + 0.2):
-            return
+            audio = audio + AudioSegment.silent(
+                duration=max_duration_ms - total_duration
+            )
 
         for i in range(0, total_duration, max_duration_ms):
             segment = audio[i : i + max_duration_ms]
@@ -88,8 +93,10 @@ class DatasetBuilder:
             max_duration_ms (int, optional): the maximal duration in ms of the audio. Defaults to 10000.
         """
 
-        filename_list = [f for f in os.listdir(audio_dir) if f.endswith(".mp3")]
-
+        filename_list = [
+            f for f in os.listdir(audio_dir) if f.endswith(tuple(SUPPORTED_EXTENSIONS))
+        ]
+        print(f"Processing {len(filename_list)} files")
         with ThreadPoolExecutor() as executor:
             futures = [
                 executor.submit(
@@ -133,7 +140,7 @@ class DatasetBuilder:
 
         for used_codec in self.codec:
             for files in os.listdir(dataset_dir):
-                if not files.endswith(".mp3"):
+                if not files.endswith(tuple(SUPPORTED_EXTENSIONS)):
                     continue
 
                 file_path = os.path.join(dataset_dir, files)

@@ -13,7 +13,9 @@ from tqdm import tqdm
 # Constants
 CHUNK_SIZE = 512 * 1024
 BASE_MUSIC_URL = "https://cdn.freesound.org/mtg-jamendo/"
-BASE_SPEECH_URL = "https://huggingface.co/datasets/TrainingDataPro/speech-emotion-recognition-dataset/resolve/main/data/audio.zip"
+BASE_SPEECH_URLS = [
+    "https://huggingface.co/datasets/EQ4You/Emotional_Speech/resolve/main/emotional_speech_part1_137.tar",
+]
 
 
 def download_file(url: str, download_path: str):
@@ -79,8 +81,12 @@ def download(download_dir: str, nb_files: int = 1000):
         if (i + 1) >= nb_files:
             break
 
-    download_file(BASE_SPEECH_URL, os.path.join(download_dir, "speech.zip"))
-    print("Download complete.")
+    for url in BASE_SPEECH_URLS:
+        print(f"Downloading {url}")
+        download_file(
+            url, os.path.join(download_dir, f"speech_{url.split('/')[-1]}.tar")
+        )
+        print("Download complete.")
 
     # extract the files
 
@@ -94,13 +100,17 @@ def download(download_dir: str, nb_files: int = 1000):
     # move all the file in directory to the download_dir
     for directory in os.listdir(download_dir):
         dir_path = os.path.join(download_dir, directory)
+
+        if not os.path.isdir(dir_path):
+            continue
+
         for file in os.listdir(dir_path):
             try:
                 shutil.move(os.path.join(dir_path, file), download_dir)
             except shutil.Error:
                 shutil.move(
                     os.path.join(dir_path, file),
-                    os.path.join(download_dir, f"{file}_{directory}"),
+                    os.path.join(download_dir, f"{directory}_{file}"),
                 )
 
         os.rmdir(dir_path)

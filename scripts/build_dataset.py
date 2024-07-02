@@ -42,7 +42,7 @@ parser.add_argument(
 parser.add_argument(
     "--max_duration_ms",
     type=int,
-    default=10000,
+    default=10_000,
     required=False,
     help="The maximal duration in ms of the audio",
 )
