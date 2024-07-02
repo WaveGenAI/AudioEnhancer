@@ -7,7 +7,7 @@ import os
 
 import bitsandbytes as bnb
 import torch
-from torch.nn import MSELoss, CrossEntropyLoss
+from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from einops import rearrange
@@ -47,7 +47,7 @@ parser.add_argument(
     "--base_model_path",
     type=str,
     required=False,
-    default="data/model/model_100.pt",
+    default="model_base.pt",
     help="Relative path to the base model",
 )
 
@@ -89,13 +89,8 @@ writer = SummaryWriter()
 #     target = mel_spectrogram_transform(target)
 #     return MSELoss()(logits, target) / 10
 
-# uniform initialization
 
-for p in model.parameters():
-    if p.dim() > 1:
-        torch.nn.init.normal_(p, 0, 0.02)
-
-loss_fn = MSELoss()
+loss_fn = [MSELoss()]
 disc_loss_fn = MSELoss()
 
 # split test and train
@@ -171,20 +166,16 @@ def eval_model(model, test_loader):
     for batch in test_loader:
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
-        base_codes = batch[2].to(device, dtype=dtype)
         c, d = x.shape[1], x.shape[2]
 
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")
 
-        y_hat, code_pred = model(x)
+        y_hat = model(x, mask=None)
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 
-        base_codes = rearrange(base_codes, "b c d t -> b (t c) d")
-
-        loss = loss_fn(y_hat, y) + (loss_fn(code_pred, base_codes) / 10000)
-
+        loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss_test += loss.detach().cpu().float().numpy()
 
     return loss_test / len(test_loader)
@@ -200,7 +191,6 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
-        base_codes = batch[2].to(device, dtype=dtype)
         c, d = x.shape[1], x.shape[2]
 
         # normalize x over the last dimension
@@ -208,14 +198,11 @@ for epoch in range(EPOCH):
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")
 
-        y_hat, code_pred = model(x)
+        y_hat = model(x, mask=None)
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 
-        base_codes = rearrange(base_codes, "b c d t -> b (t c) d")
-
-        loss = loss_fn(y_hat, y) + (loss_fn(code_pred, base_codes) / 10000)
-
+        loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
@@ -231,11 +218,7 @@ for epoch in range(EPOCH):
         # loss += disc_pred[: -y.shape[0]].mean().squeeze()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(),1)
-
-            for name, param in model.named_parameters():
-                if param.grad is not None:
-                    param.grad /= GRADIENT_ACCUMULATION_STEPS
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
 
             optimizer.step()
             optimizer.zero_grad()
