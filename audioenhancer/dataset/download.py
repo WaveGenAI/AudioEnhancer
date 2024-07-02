@@ -12,29 +12,29 @@ from tqdm import tqdm
 
 # Constants
 CHUNK_SIZE = 512 * 1024
-BASE_URL = "https://cdn.freesound.org/mtg-jamendo/"
+BASE_MUSIC_URL = "https://cdn.freesound.org/mtg-jamendo/"
+BASE_SPEECH_URL = "https://huggingface.co/datasets/TrainingDataPro/speech-emotion-recognition-dataset/resolve/main/data/audio.zip"
 
 
-def download_from_mtg_fast(download_file: str, download_path: str):
-    """Download a file from the MTG server.
+def download_file(url: str, download_path: str):
+    """Download a file from the given url.
 
     Args:
-        download_file (str): the file to download
+        url (str): the url of the tar file
         download_path (str): the path to save the file
     """
-    res = requests.get(
-        BASE_URL + f"raw_30s/audio/{download_file}", stream=True, timeout=10
-    )
 
+    res = requests.get(url, stream=True, timeout=10)
     total = res.headers.get("Content-Length")
     if total is not None:
         total = int(total)
+
     with tempfile.NamedTemporaryFile(delete=False) as tmp_file_d:
         with tqdm(total=total, unit="B", unit_scale=True) as progressbar:
             for chunk in res.iter_content(chunk_size=CHUNK_SIZE):
                 tmp_file_d.write(chunk)
                 progressbar.update(len(chunk))
-        shutil.move(tmp_file_d.name, os.path.join(download_path, download_file))
+        shutil.move(tmp_file_d.name, download_path)
 
 
 def download(download_dir: str, nb_files: int = 1000):
@@ -48,7 +48,7 @@ def download(download_dir: str, nb_files: int = 1000):
         ValueError: if the hash of one of the files is incorrect
     """
 
-    file_sha256_tars = BASE_URL + "raw_30s/audio/checksums_sha256.txt"
+    file_sha256_tars = BASE_MUSIC_URL + "raw_30s/audio/checksums_sha256.txt"
 
     # download the checksums file
     res = requests.get(file_sha256_tars, timeout=10)
@@ -66,7 +66,9 @@ def download(download_dir: str, nb_files: int = 1000):
             continue
 
         print(f"Downloading {file}")
-        download_from_mtg_fast(file, download_dir)
+
+        url = BASE_MUSIC_URL + f"raw_30s/audio/{file}"
+        download_file(url, os.path.join(download_dir, file))
 
         # check if the hash is correct
         with open(os.path.join(download_dir, file), "rb") as f:
@@ -77,12 +79,13 @@ def download(download_dir: str, nb_files: int = 1000):
         if (i + 1) >= nb_files:
             break
 
+    download_file(BASE_SPEECH_URL, os.path.join(download_dir, "speech.zip"))
     print("Download complete.")
 
     # extract the files
 
     for file in os.listdir(download_dir):
-        if file.endswith(".tar"):
+        if file.endswith(".tar") or file.endswith(".zip"):
             print(f"Extracting {file}")
             path = os.path.join(download_dir, file)
             shutil.unpack_archive(path, download_dir)
@@ -92,7 +95,14 @@ def download(download_dir: str, nb_files: int = 1000):
     for directory in os.listdir(download_dir):
         dir_path = os.path.join(download_dir, directory)
         for file in os.listdir(dir_path):
-            shutil.move(os.path.join(dir_path, file), download_dir)
+            try:
+                shutil.move(os.path.join(dir_path, file), download_dir)
+            except shutil.Error:
+                shutil.move(
+                    os.path.join(dir_path, file),
+                    os.path.join(download_dir, f"{file}_{directory}"),
+                )
+
         os.rmdir(dir_path)
 
     print("Extraction complete.")
