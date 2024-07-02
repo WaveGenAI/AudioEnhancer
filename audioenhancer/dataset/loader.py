@@ -141,27 +141,28 @@ class SynthDataset(Dataset):
 
         if random.random() < self._prob:
             strength = torch.rand(compressed_waveform.shape[:2]) * 0.01
-            strength_expanded = strength.unsqueeze(2).expand(-1, -1, compressed_waveform.shape[2]).cuda()
+            strength_expanded = (
+                strength.unsqueeze(2)
+                .expand(-1, -1, compressed_waveform.shape[2])
+                .cuda()
+            )
             noise = torch.randn_like(compressed_waveform).cuda()
             compressed_waveform = compressed_waveform + noise * strength_expanded
 
         if self._mono:
             compressed_waveform = compressed_waveform.mean(dim=1)
             base_waveform = base_waveform.mean(dim=1)
+        else:
+            if compressed_waveform.shape[0] == 1:
+                compressed_waveform = compressed_waveform.repeat(2, 1, 1)
+            if base_waveform.shape[0] == 1:
+                base_waveform = base_waveform.repeat(2, 1, 1)
 
         encoded_compressed_waveform, _, _, _, _ = self.autoencoder.encode(
             compressed_waveform
         )
 
         encoded_base_waveform, codes, _, _, _ = self.autoencoder.encode(base_waveform)
-
-        if not self._mono:
-            if encoded_compressed_waveform.shape[0] == 1:
-                encoded_compressed_waveform = encoded_compressed_waveform.repeat(
-                    2, 1, 1
-                )
-            if encoded_base_waveform.shape[0] == 1:
-                encoded_base_waveform = encoded_base_waveform.repeat(2, 1, 1)
 
         return (
             encoded_compressed_waveform,
