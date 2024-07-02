@@ -157,12 +157,6 @@ def eval_model(model, test_loader):
         y = batch[1].to(device, dtype=dtype)
         c, d = x.shape[1], x.shape[2]
 
-        # normalize x over the last dimension
-
-        mean_x = x.mean(dim=-1, keepdim=True)
-        std_x = x.std(dim=-1, keepdim=True)
-        x = (x - mean_x) / std_x
-
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")
 

@@ -165,8 +165,8 @@ model_xtransformer = ContinuousTransformerWrapper(
     dim_out=1024,
     max_seq_len=0,
     attn_layers=Encoder(
-        dim=512,
-        depth=12,
+        dim=1024,
+        depth=16,
         heads=8,
         attn_flash=True,
         cross_attend=False,
@@ -174,5 +174,6 @@ model_xtransformer = ContinuousTransformerWrapper(
         rotary_pos_emb=True,
         ff_swish=True,
         ff_glu=True,
+        use_scalenorm=True,
     ),
 )

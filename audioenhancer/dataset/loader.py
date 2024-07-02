@@ -8,8 +8,8 @@ import os
 
 import dac
 import torch
-import torchaudio
 from audiotools import AudioSignal
+from audiotools import transforms as tfm
 from torch.utils.data import Dataset
 
 
@@ -23,6 +23,18 @@ class SynthDataset(Dataset):
         mono: bool = True,
         input_freq: int = 16000,
         output_freq: int = 16000,
+        transform: list = [
+            tfm.CorruptPhase,
+            tfm.FrequencyNoise,
+            tfm.HighPass,
+            tfm.LowPass,
+            tfm.MuLawQuantization,
+            tfm.NoiseFloor,
+            tfm.Quantization,
+            tfm.Smoothing,
+            tfm.TimeNoise,
+        ],
+        overall_prob: float = 0.5,
     ):
         """Initializes the dataset.
 
@@ -32,6 +44,8 @@ class SynthDataset(Dataset):
             mono (bool): Whether to load the audio as mono.
             input_freq (int): The input frequency of the audio.
             output_freq (int): The output frequency of the audio.
+            transform (list): The list of transforms to apply to the audio.
+            overall_prob (float): The overall probability of applying the transforms.
         """
 
         super().__init__()
@@ -57,6 +71,9 @@ class SynthDataset(Dataset):
         self.autoencoder = dac.DAC.load(model_path).to("cuda")
         self.autoencoder.eval()
         self.autoencoder.requires_grad_(False)
+
+        prob = overall_prob / len(transform)
+        self._transform = tfm.Compose([trsfm(prob=prob) for trsfm in transform])
 
     def __len__(self) -> int:
         """Returns the number of waveforms in the dataset.
@@ -90,6 +107,9 @@ class SynthDataset(Dataset):
 
         base_waveform = base_waveform.resample(self.autoencoder.sample_rate)
         compressed_waveform = compressed_waveform.resample(self.autoencoder.sample_rate)
+
+        kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
+        compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
 
         compressed_waveform = compressed_waveform[:, :, : self._pad_length_input]
         base_waveform = base_waveform[:, :, : self._pad_length_output]
