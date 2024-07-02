@@ -5,9 +5,11 @@ Module to load the audio dataset.
 import glob
 import math
 import os
+import random
 
 import dac
 import torch
+import torchaudio
 from audiotools import AudioSignal
 from audiotools import transforms as tfm
 from torch.utils.data import Dataset
@@ -108,8 +110,6 @@ class SynthDataset(Dataset):
         base_waveform = base_waveform.resample(self.autoencoder.sample_rate)
         compressed_waveform = compressed_waveform.resample(self.autoencoder.sample_rate)
 
-        kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
-        compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
 
         compressed_waveform = compressed_waveform[:, :, : self._pad_length_input]
         base_waveform = base_waveform[:, :, : self._pad_length_output]
@@ -136,6 +136,18 @@ class SynthDataset(Dataset):
 
         compressed_waveform = compressed_waveform.transpose(0, 1).cuda()
         base_waveform = base_waveform.transpose(0, 1).cuda()
+
+        kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
+        compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
+
+        if random.random() > 0.5:
+            strength = torch.rand(compressed_waveform.shape[:2]) * 1.5
+            noise = torch.randn_like(compressed_waveform) * 0.2
+            compressed_waveform = torchaudio.functional.add_noise(
+                compressed_waveform,
+                noise=noise.cuda(),
+                snr=strength.cuda(),
+            )
 
         encoded_compressed_waveform, _, _, _, _ = self.autoencoder.encode(
             compressed_waveform

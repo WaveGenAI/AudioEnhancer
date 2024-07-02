@@ -44,6 +44,14 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--base_model_path",
+    type=str,
+    required=False,
+    default="model_base.pt",
+    help="Relative path to the base model",
+)
+
+parser.add_argument(
     "--mono",
     action="store_true",
     help="Use mono audio",
@@ -99,6 +107,11 @@ train_loader = torch.utils.data.DataLoader(
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+if os.path.exists(args.model_path + args.base_model_path):
+    model.load_state_dict(torch.load(args.model_path + args.base_model_path))
+    print("Model loaded")
+
 print(f"Using device {device}")
 model.to(device, dtype=dtype)
 
@@ -183,10 +196,6 @@ for epoch in range(EPOCH):
         c, d = x.shape[1], x.shape[2]
 
         # normalize x over the last dimension
-
-        mean_x = x.mean(dim=-1, keepdim=True)
-        std_x = x.std(dim=-1, keepdim=True)
-        x = (x - mean_x) / std_x
 
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")

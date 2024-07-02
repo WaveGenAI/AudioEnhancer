@@ -183,14 +183,34 @@ class MambaMixer(nn.Module):
         return hidden_states
 
 
+class MLP(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        self.config = config
+        self.hidden_size = config.hidden_size
+        self.intermediate_size = config.intermediate_size
+        self.norm = RMSNorm(self.hidden_size, eps=1e-6)
+        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=config.use_bias)
+        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias=config.use_bias)
+        self.act = nn.SiLU()
+        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias=config.use_bias)
+
+    def forward(self, hidden_states):
+        hidden_states = self.norm(hidden_states)
+        hidden_states = self.act(self.gate_proj(hidden_states)) * self.up_proj(hidden_states)
+        return self.down_proj(hidden_states)
+
+
 class MambaBlock(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.config = config
         self.residual_in_fp32 = config.residual_in_fp32
         self.norm = RMSNorm(config.hidden_size, eps=1e-6)
+
         self.mixer = MambaMixer(config)
         self.mixer_rev = MambaMixer(config)
+        # self.mlp = MLP(config)
 
     def forward(self, hidden_states):
         residual = hidden_states
@@ -198,14 +218,20 @@ class MambaBlock(nn.Module):
         if self.residual_in_fp32:
             original_dtype = hidden_states.dtype
             residual = residual.to(torch.float32)
+            hidden_states = hidden_states.to(torch.float32)
+            self.mixer.to(torch.float32)
+            self.mixer_rev.to(torch.float32)
 
         out = self.mixer(hidden_states)
         out_rev = self.mixer_rev(
             hidden_states.flip(dims=(1,))
         ).flip(dims=(1,))
         hidden_states = out + out_rev
-        hidden_states = residual + hidden_states
 
         if self.residual_in_fp32:
             hidden_states = hidden_states.to(original_dtype)
-        return hidden_states
+            residual = residual.to(original_dtype)
+        hidden_states = residual + hidden_states
+        # residual = hidden_states
+        # hidden_states = self.mlp(hidden_states)
+        return hidden_states    # + residual
