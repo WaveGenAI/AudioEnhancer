@@ -47,7 +47,7 @@ class LatentProcessor(nn.Module):
     This module processes the latent space of the audio autoencoder.
     """
 
-    def __init__(self, in_dim: int, out_dim: int, latent_dim, num_layer):
+    def __init__(self, in_dim: int, out_dim: int, num_code_book: int, latent_dim, num_layer):
         super().__init__()
         self.latent_dim = latent_dim
         self.num_layer = num_layer
@@ -55,6 +55,7 @@ class LatentProcessor(nn.Module):
 
         self.in_proj = nn.Linear(in_dim, latent_dim)
         self.out_proj = nn.Linear(latent_dim, out_dim)
+        self.code_proj = nn.Linear(latent_dim, num_code_book)
 
         self.layers = nn.ModuleList()
         for i in range(num_layer):
@@ -64,4 +65,4 @@ class LatentProcessor(nn.Module):
         x = self.in_proj(x)
         for layer in self.layers:
             x = layer(x)
-        return self.out_proj(x)
+        return self.out_proj(x), self.code_proj(x)

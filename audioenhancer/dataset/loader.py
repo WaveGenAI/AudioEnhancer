@@ -153,11 +153,7 @@ class SynthDataset(Dataset):
             compressed_waveform
         )
 
-        encoded_base_waveform, _, _, _, _ = self.autoencoder.encode(base_waveform)
-
-        if self._mono:
-            encoded_compressed_waveform = encoded_compressed_waveform.mean(dim=1)
-            encoded_base_waveform = encoded_base_waveform.mean(dim=1)
+        encoded_base_waveform, codes, _, _, _ = self.autoencoder.encode(base_waveform)
 
         if not self._mono:
             if encoded_compressed_waveform.shape[0] == 1:
@@ -170,4 +166,5 @@ class SynthDataset(Dataset):
         return (
             encoded_compressed_waveform,
             encoded_base_waveform,
+            codes,
         )

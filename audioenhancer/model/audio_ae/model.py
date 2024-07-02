@@ -182,6 +182,7 @@ model_xtransformer = ContinuousTransformerWrapper(
 mamba_model = LatentProcessor(
     in_dim=1024,
     out_dim=1024,
+    num_code_book=9,
     latent_dim=2048,
     num_layer=8,
 )
