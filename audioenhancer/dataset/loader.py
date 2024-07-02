@@ -140,13 +140,14 @@ class SynthDataset(Dataset):
         base_waveform = base_waveform.transpose(0, 1).cuda()
 
         if random.random() < self._prob:
-            strength = torch.rand(compressed_waveform.shape[:2]) * 1.5
-            noise = torch.randn_like(compressed_waveform) * 0.2
-            compressed_waveform = torchaudio.functional.add_noise(
-                compressed_waveform,
-                noise=noise.cuda(),
-                snr=strength.cuda(),
-            )
+            strength = torch.rand(compressed_waveform.shape[:2]) * 0.01
+            strength_expanded = strength.unsqueeze(2).expand(-1, -1, compressed_waveform.shape[2]).cuda()
+            noise = torch.randn_like(compressed_waveform).cuda()
+            compressed_waveform = compressed_waveform + noise * strength_expanded
+
+        if self._mono:
+            compressed_waveform = compressed_waveform.mean(dim=1)
+            base_waveform = base_waveform.mean(dim=1)
 
         encoded_compressed_waveform, _, _, _, _ = self.autoencoder.encode(
             compressed_waveform
