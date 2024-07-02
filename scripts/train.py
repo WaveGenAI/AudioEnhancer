@@ -218,7 +218,11 @@ for epoch in range(EPOCH):
         # loss += disc_pred[: -y.shape[0]].mean().squeeze()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
-            torch.nn.utils.clip_grad_norm_(model.parameters(), 0.5)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
+
+            for name, param in model.named_parameters():
+                if param.grad is not None:
+                    param.grad /= GRADIENT_ACCUMULATION_STEPS
 
             optimizer.step()
             optimizer.zero_grad()
