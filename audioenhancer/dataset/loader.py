@@ -74,8 +74,8 @@ class SynthDataset(Dataset):
         self.autoencoder.eval()
         self.autoencoder.requires_grad_(False)
 
-        prob = overall_prob / len(transform)
-        self._transform = tfm.Compose([trsfm(prob=prob) for trsfm in transform])
+        self._prob = overall_prob / (len(transform) + 1)
+        self._transform = tfm.Compose([trsfm(prob=self._prob) for trsfm in transform])
 
     def __len__(self) -> int:
         """Returns the number of waveforms in the dataset.
@@ -110,9 +110,11 @@ class SynthDataset(Dataset):
         base_waveform = base_waveform.resample(self.autoencoder.sample_rate)
         compressed_waveform = compressed_waveform.resample(self.autoencoder.sample_rate)
 
-
         compressed_waveform = compressed_waveform[:, :, : self._pad_length_input]
         base_waveform = base_waveform[:, :, : self._pad_length_output]
+
+        kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
+        compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
 
         compressed_waveform = self.autoencoder.preprocess(
             compressed_waveform.audio_data, compressed_waveform.sample_rate
@@ -137,10 +139,7 @@ class SynthDataset(Dataset):
         compressed_waveform = compressed_waveform.transpose(0, 1).cuda()
         base_waveform = base_waveform.transpose(0, 1).cuda()
 
-        kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
-        compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
-
-        if random.random() > 0.5:
+        if random.random() < self._prob:
             strength = torch.rand(compressed_waveform.shape[:2]) * 1.5
             noise = torch.randn_like(compressed_waveform) * 0.2
             compressed_waveform = torchaudio.functional.add_noise(
