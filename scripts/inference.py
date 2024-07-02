@@ -12,7 +12,7 @@ from dac import DACFile
 from einops import rearrange
 
 from audioenhancer.constants import MAX_AUDIO_LENGTH, SAMPLING_RATE
-from audioenhancer.model.audio_ae.model import model_xtransformer as model
+from audioenhancer.model.audio_ae.model import model_xtransformer_codebook as model
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -68,6 +68,7 @@ model.load_state_dict(torch.load(args.model_path))
 autoencoder_path = dac.utils.download(model_type="44khz")
 autoencoder = dac.DAC.load(autoencoder_path).to("cuda")
 audio = load(args.audio)
+
 output = torch.Tensor()
 ae_input = torch.Tensor()
 
@@ -112,32 +113,21 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
         c, d = encoded.shape[1], encoded.shape[2]
         encoded = rearrange(encoded, "b c d t -> b (t c) d")
 
-        pred, codes = model(encoded)
+        # predict codebook
+        codes = model(encoded)
+        codes = rearrange(codes, " b (t c) d ->b c d t", c=2, d=9)
 
-        pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
-        pred = pred.squeeze(0)
-
-        codes = rearrange(codes.round(), " b (t c) d ->b c d t", c=2, d=9)
         codes = codes.squeeze(0).to(torch.int32)
-        dacfile = DACFile(
-            codes=codes,
-            chunk_length=chunk.size(2),
-            original_length=CHUNCK_SIZE,
-            input_db=0,
-            channels=2,
-            sample_rate=args.sampling_rate,
-            padding=True,
-            dac_version="1.0.0",
-        )
-        decoded = autoencoder.decompress(dacfile)
+        z = autoencoder.quantizer.from_codes(codes)[0]
 
-        decoded = decoded.audio_data.transpose(0, 1)
+        decoded = autoencoder.decode(z)
+
+        decoded = decoded.transpose(0, 1)
 
         output = torch.cat([output, decoded], dim=2)
 
-
 # fix runtime error: numpy
-output = output.squeeze(1).detach().cpu()
+output = output.squeeze(0).detach().cpu()
 ae_input = ae_input.squeeze(0).detach().cpu()
 
 
