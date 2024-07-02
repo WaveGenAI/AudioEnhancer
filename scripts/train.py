@@ -108,9 +108,13 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=Fa
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-if os.path.exists(args.model_path + args.base_model_path):
-    model.load_state_dict(torch.load(args.model_path + args.base_model_path))
+if os.path.exists(args.base_model_path):
+    model.load_state_dict(torch.load(args.base_model_path))
     print("Model loaded")
+else:
+    for p in model.parameters():
+        if p.dim() > 1:
+            torch.nn.init.xavier_uniform_(p)
 
 print(f"Using device {device}")
 model.to(device, dtype=dtype)
@@ -150,12 +154,6 @@ scheduler = lr_scheduler.LinearLR(
 #     end_factor=1e-6,
 #     total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 # )
-
-# xavier initialization
-
-for p in model.parameters():
-    if p.dim() > 1:
-        torch.nn.init.xavier_uniform_(p)
 
 # print number of parameters
 print(f"Number of parameters: {sum(p.numel() for p in model.parameters()) / 1e6}M")
