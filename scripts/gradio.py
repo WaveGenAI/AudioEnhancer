@@ -37,9 +37,16 @@ Inference = Inference(args.model_path, args.sampling_rate)
 
 
 def enhancer(filepath):
+    if not filepath:
+        return None
+
     return Inference.inference(filepath)
 
 
-demo = gr.Interface(enhancer, gr.Audio(type="filepath"), "audio")
+article = """
+Enhance the audio file. Please wait that the audio is uploaded before clicking on the Submit button.
+"""
+
+demo = gr.Interface(enhancer, gr.Audio(type="filepath"), "audio", article=article)
 
 demo.launch(share=args.share)

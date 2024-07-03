@@ -102,6 +102,9 @@ class Inference:
         output = output.squeeze(0).detach().cpu()
         ae_input = ae_input.squeeze(0).detach().cpu()
 
+        # cut the audio to the original size
+        output = output[:, : audio.size(2)]
+
         torchaudio.save(
             "./data/input.mp3",
             ae_input.T,
@@ -112,5 +115,4 @@ class Inference:
             "./data/output.mp3", output.T, self._sampling_rate, channels_first=False
         )
 
-        print(os.path.abspath("./data/output.mp3"))
         return os.path.abspath("./data/output.mp3")
