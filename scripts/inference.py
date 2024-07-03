@@ -8,11 +8,10 @@ import math
 import dac
 import torch
 import torchaudio
-from dac import DACFile
 from einops import rearrange
 
 from audioenhancer.constants import MAX_AUDIO_LENGTH, SAMPLING_RATE
-from audioenhancer.model.audio_ae.model import model_xtransformer_codebook as model
+from audioenhancer.model.audio_ae.model import model_xtransformer as model
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -27,7 +26,7 @@ parser.add_argument(
     "--model_path",
     type=str,
     required=False,
-    default="data/model/model_100.pt",
+    default="data/model/model_2000.pt",
     help="The path to the model",
 )
 
@@ -62,13 +61,14 @@ def load(waveform_path):
     return waveform
 
 
-CHUNCK_SIZE = 2 ** math.ceil(math.log2(MAX_AUDIO_LENGTH * args.sampling_rate))
+CHUNCK_SIZE = MAX_AUDIO_LENGTH * args.sampling_rate
 model.load_state_dict(torch.load(args.model_path))
+model.eval()
 
 autoencoder_path = dac.utils.download(model_type="44khz")
 autoencoder = dac.DAC.load(autoencoder_path).to("cuda")
-audio = load(args.audio)
 
+audio = load(args.audio)
 output = torch.Tensor()
 ae_input = torch.Tensor()
 
@@ -76,6 +76,7 @@ device = torch.device("cuda")
 audio = audio.to(device)
 model = model.to(device)
 autoencoder.to(device)
+
 output = output.to(device)
 ae_input = ae_input.to(device)
 
@@ -98,33 +99,35 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
     with torch.no_grad():
         print(f"Processing chunk {i}", end="\r")
 
-        encoded, _, _, _, _ = autoencoder.encode(chunk.transpose(0, 1))
+        encoded, encoded_q, _, _, _, _ = autoencoder.encode(chunk.transpose(0, 1))
 
         # create input for the model
-        decoded = autoencoder.decode(encoded)
+        decoded = autoencoder.decode(encoded_q)
 
         decoded = decoded.transpose(0, 1)
 
         ae_input = torch.cat([ae_input, decoded], dim=2)
 
-        # create output for the model
-
         encoded = encoded.unsqueeze(0)
         c, d = encoded.shape[1], encoded.shape[2]
         encoded = rearrange(encoded, "b c d t -> b (t c) d")
 
-        # predict codebook
-        codes = model(encoded)
-        codes = rearrange(codes, " b (t c) d ->b c d t", c=2, d=9)
+        pred = model(encoded)
 
-        codes = codes.squeeze(0).to(torch.int32)
-        z = autoencoder.quantizer.from_codes(codes)[0]
+        pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
+        pred = pred.squeeze(0)
 
-        decoded = autoencoder.decode(z)
+        # quantize
+        z_q, codes, latents, commitment_loss, codebook_loss = autoencoder.quantizer(
+            pred, None
+        )
+
+        decoded = autoencoder.decode(z_q)
 
         decoded = decoded.transpose(0, 1)
 
         output = torch.cat([output, decoded], dim=2)
+
 
 # fix runtime error: numpy
 output = output.squeeze(0).detach().cpu()

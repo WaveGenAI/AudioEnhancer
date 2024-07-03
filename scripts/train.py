@@ -24,7 +24,7 @@ from audioenhancer.constants import (
     EVAL_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
-from audioenhancer.model.audio_ae.model import model_xtransformer as model
+from audioenhancer.model.audio_ae.model import model_xtransformer_small as model
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -94,7 +94,7 @@ loss_fn = [MSELoss()]
 disc_loss_fn = MSELoss()
 
 # split test and train
-test_size = min(len(dataset) * 0.1, 100)
+test_size = min(len(dataset) * 0.1, 200)
 train_size = len(dataset) - test_size
 
 train_dataset, test_dataset = torch.utils.data.random_split(
@@ -158,6 +158,13 @@ scheduler = lr_scheduler.LinearLR(
 # print number of parameters
 print(f"Number of parameters: {sum(p.numel() for p in model.parameters()) / 1e6}M")
 
+import dac
+
+autoencoder_path = dac.utils.download(model_type="44khz")
+autoencoder = dac.DAC.load(autoencoder_path).to("cuda")
+autoencoder.eval()
+autoencoder.requires_grad_(False)
+
 
 def eval_model(model, test_loader):
     model.eval()
@@ -193,12 +200,10 @@ for epoch in range(EPOCH):
         y = batch[1].to(device, dtype=dtype)
         c, d = x.shape[1], x.shape[2]
 
-        # normalize x over the last dimension
-
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")
 
-        y_hat = model(x, mask=None)
+        y_hat = model(x)
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 

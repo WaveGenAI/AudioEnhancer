@@ -74,8 +74,12 @@ class SynthDataset(Dataset):
         self.autoencoder.eval()
         self.autoencoder.requires_grad_(False)
 
-        self._prob = overall_prob / (len(transform) + 1)
+        self._prob = overall_prob / len(transform)
         self._transform = tfm.Compose([trsfm(prob=self._prob) for trsfm in transform])
+
+        self._transform2 = tfm.Compose(
+            [trsfm(prob=self._prob * 2) for trsfm in transform]
+        )
 
     def __len__(self) -> int:
         """Returns the number of waveforms in the dataset.
@@ -113,8 +117,14 @@ class SynthDataset(Dataset):
         compressed_waveform = compressed_waveform[:, :, : self._pad_length_input]
         base_waveform = base_waveform[:, :, : self._pad_length_output]
 
-        kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
-        compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
+        if not "hq" in codec:
+            kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
+            compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
+        else:
+            kwargs = self._transform2.instantiate(signal=compressed_waveform.clone())
+            compressed_waveform = self._transform2(
+                compressed_waveform.clone(), **kwargs
+            )
 
         compressed_waveform = self.autoencoder.preprocess(
             compressed_waveform.audio_data, compressed_waveform.sample_rate
@@ -139,16 +149,6 @@ class SynthDataset(Dataset):
         compressed_waveform = compressed_waveform.transpose(0, 1).cuda()
         base_waveform = base_waveform.transpose(0, 1).cuda()
 
-        if random.random() < self._prob:
-            strength = torch.rand(compressed_waveform.shape[:2]) * 0.01
-            strength_expanded = (
-                strength.unsqueeze(2)
-                .expand(-1, -1, compressed_waveform.shape[2])
-                .cuda()
-            )
-            noise = torch.randn_like(compressed_waveform).cuda()
-            compressed_waveform = compressed_waveform + noise * strength_expanded
-
         if self._mono:
             compressed_waveform = compressed_waveform.mean(dim=1)
             base_waveform = base_waveform.mean(dim=1)
@@ -158,11 +158,13 @@ class SynthDataset(Dataset):
             if base_waveform.shape[0] == 1:
                 base_waveform = base_waveform.repeat(2, 1, 1)
 
-        encoded_compressed_waveform, _, _, _, _ = self.autoencoder.encode(
+        encoded_compressed_waveform, _, _, _, _, _ = self.autoencoder.encode(
             compressed_waveform
         )
 
-        encoded_base_waveform, codes, _, _, _ = self.autoencoder.encode(base_waveform)
+        encoded_base_waveform, _, codes, _, _, _ = self.autoencoder.encode(
+            base_waveform
+        )
 
         return (
             encoded_compressed_waveform,
