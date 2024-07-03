@@ -12,12 +12,12 @@ from dac import DACFile
 from einops import rearrange
 
 from audioenhancer.constants import MAX_AUDIO_LENGTH, SAMPLING_RATE
-from audioenhancer.model.audio_ae.model import model_xtransformer_codebook as model
+from audioenhancer.model.audio_ae.model import mamba_model as model
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--audio",
-    default="../data/test.mp3",
+    default="../media/works/dataset/opus/5700_part2.mp3",
     type=str,
     required=False,
     help="The path to the audio file to enhance",
@@ -27,7 +27,7 @@ parser.add_argument(
     "--model_path",
     type=str,
     required=False,
-    default="data/model/model_100.pt",
+    default="data/model/model_200.pt",
     help="The path to the model",
 )
 
@@ -68,7 +68,6 @@ model.load_state_dict(torch.load(args.model_path))
 autoencoder_path = dac.utils.download(model_type="44khz")
 autoencoder = dac.DAC.load(autoencoder_path).to("cuda")
 audio = load(args.audio)
-
 output = torch.Tensor()
 ae_input = torch.Tensor()
 
@@ -98,10 +97,23 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
     with torch.no_grad():
         print(f"Processing chunk {i}", end="\r")
 
-        encoded, _, _, _, _ = autoencoder.encode(chunk.transpose(0, 1))
+        z, orig_code, latent, _, _ = autoencoder.encode(chunk.transpose(0, 1))
 
         # create input for the model
-        decoded = autoencoder.decode(encoded)
+        z_q = 0
+        latent_split = torch.split(latent, 8, dim=1)
+        for i, quantizer in enumerate(autoencoder.quantizer.quantizers):
+            z_q_i, _ = quantizer.decode_latents(latent_split[i])
+            z_q_i = (
+                    latent_split[i] + (z_q_i - latent_split[i]).detach()
+            )
+            z_q_i = quantizer.out_proj(z_q_i)
+            mask = (
+                    torch.full((z_q_i.shape[0],), fill_value=i, device=z_q_i.device) < 9
+            )
+            z_q = z_q + z_q_i * mask[:, None, None]
+
+        decoded = autoencoder.decode(z_q)
 
         decoded = decoded.transpose(0, 1)
 
@@ -109,18 +121,33 @@ for i in range(0, audio.size(2), int(CHUNCK_SIZE)):
 
         # create output for the model
 
-        encoded = encoded.unsqueeze(0)
+        encoded = latent.unsqueeze(0)
         c, d = encoded.shape[1], encoded.shape[2]
         encoded = rearrange(encoded, "b c d t -> b (t c) d")
 
         # predict codebook
-        codes = model(encoded)
-        codes = rearrange(codes, " b (t c) d ->b c d t", c=2, d=9)
+        pred, codes = model(encoded)
+        # codes = torch.argmax(codes, dim=-1)
+        # codes = rearrange(codes, " (b t c) d ->b c d t", b=1, c=2, d=9)
+        #
+        # codes = codes.squeeze(0).to(torch.int32)
+        # z = autoencoder.quantizer.from_codes(codes)[0]
 
-        codes = codes.squeeze(0).to(torch.int32)
-        z = autoencoder.quantizer.from_codes(codes)[0]
+        z = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d).squeeze(0)
+        z_q = 0
+        latent = torch.split(latent, 8, dim=1)
+        for i, quantizer in enumerate(autoencoder.quantizer.quantizers):
+            z_q_i, _ = quantizer.decode_latents(latent[i])
+            z_q_i = (
+                    latent[i] + (z_q_i - latent[i]).detach()
+            )
+            z_q_i = quantizer.out_proj(z_q_i)
+            mask = (
+                    torch.full((z_q_i.shape[0],), fill_value=i, device=z_q_i.device) < 9
+            )
+            z_q = z_q + z_q_i * mask[:, None, None]
 
-        decoded = autoencoder.decode(z)
+        decoded = autoencoder.decode(z_q)
 
         decoded = decoded.transpose(0, 1)
 

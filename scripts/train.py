@@ -4,6 +4,7 @@ Code for training.
 
 import argparse
 import os
+import random
 
 import bitsandbytes as bnb
 import torch
@@ -24,7 +25,7 @@ from audioenhancer.constants import (
     EVAL_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
-from audioenhancer.model.audio_ae.model import model_xtransformer as model
+from audioenhancer.model.audio_ae.model import mamba_model as model
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -47,7 +48,7 @@ parser.add_argument(
     "--base_model_path",
     type=str,
     required=False,
-    default="data/model/model_100.pt",
+    default="data/model/model_600.pt",
     help="Relative path to the base model",
 )
 
@@ -59,7 +60,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-dtype = torch.float32
+dtype = torch.bfloat16
 
 # Load the dataset
 dataset = SynthDataset(
@@ -96,6 +97,7 @@ for p in model.parameters():
         torch.nn.init.normal_(p, 0, 0.02)
 
 loss_fn = MSELoss()
+cross_entropy_loss = CrossEntropyLoss()
 disc_loss_fn = MSELoss()
 
 # split test and train
@@ -116,10 +118,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 if os.path.exists(args.base_model_path):
     model.load_state_dict(torch.load(args.base_model_path))
     print("Model loaded")
-else:
-    for p in model.parameters():
-        if p.dim() > 1:
-            torch.nn.init.xavier_uniform_(p)
 
 print(f"Using device {device}")
 model.to(device, dtype=dtype)
@@ -132,7 +130,7 @@ optimizer = bnb.optim.AdamW8bit(
     [
         {"params": model.parameters()},
     ],
-    lr=1e-4,
+    lr=4e-5,
     betas=(0.95, 0.999),
     eps=1e-6,
     weight_decay=1e-3,
@@ -148,8 +146,8 @@ optimizer = bnb.optim.AdamW8bit(
 
 scheduler = lr_scheduler.LinearLR(
     optimizer,
-    start_factor=1,
-    end_factor=1e-6,
+    start_factor=0.9,
+    end_factor=1e-8,
     total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 )
 
@@ -159,6 +157,8 @@ scheduler = lr_scheduler.LinearLR(
 #     end_factor=1e-6,
 #     total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 # )
+
+
 
 # print number of parameters
 print(f"Number of parameters: {sum(p.numel() for p in model.parameters()) / 1e6}M")
@@ -171,7 +171,7 @@ def eval_model(model, test_loader):
     for batch in test_loader:
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
-        base_codes = batch[2].to(device, dtype=dtype)
+        base_codes = batch[2].to(device, dtype=torch.long)
         c, d = x.shape[1], x.shape[2]
 
         # rearrange x and y
@@ -181,9 +181,10 @@ def eval_model(model, test_loader):
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 
-        base_codes = rearrange(base_codes, "b c d t -> b (t c) d")
-
-        loss = loss_fn(y_hat, y) + (loss_fn(code_pred, base_codes) / 10000)
+        # base_codes = base_codes.view(-1).to(torch.long)
+        # code_pred = code_pred.view(-1, 1024)
+        # cross_loss = cross_entropy_loss(code_pred.float(), base_codes)
+        loss = loss_fn(y_hat, y)
 
         loss_test += loss.detach().cpu().float().numpy()
 
@@ -200,7 +201,7 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
-        base_codes = batch[2].to(device, dtype=dtype)
+        base_codes = batch[2].to(device, dtype=torch.long)
         c, d = x.shape[1], x.shape[2]
 
         # normalize x over the last dimension
@@ -212,9 +213,15 @@ for epoch in range(EPOCH):
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 
-        base_codes = rearrange(base_codes, "b c d t -> b (t c) d")
+        # base_codes = rearrange(base_codes, "b c d t -> (b t c) d").to(torch.int32).contiguous()
 
-        loss = loss_fn(y_hat, y) + (loss_fn(code_pred, base_codes) / 10000)
+        loss = loss_fn(y_hat, y) # + cross_loss
+
+        # if random.random() < 0.1:
+        #     base_codes = base_codes.view(-1).to(torch.long)
+        #     code_pred = code_pred.view(-1, 1024)
+        #     cross_loss = cross_entropy_loss(code_pred.float(), base_codes).detach().cpu().item()
+        #     print(f"Loss: {loss.detach().cpu().item()}, Cross Loss: {cross_loss}")
 
         loss.backward()
 

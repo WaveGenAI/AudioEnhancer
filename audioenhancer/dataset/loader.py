@@ -54,13 +54,15 @@ class SynthDataset(Dataset):
 
         self.filenames = glob.glob(audio_dir + "/*.mp3")
 
-        self.codecs = [
-            f
-            for f in glob.glob(
-                audio_dir + "/*",
-            )
-            if os.path.isdir(f)
-        ]
+        # self.codecs = [
+        #     f
+        #     for f in glob.glob(
+        #         audio_dir + "/*",
+        #     )
+        #     if os.path.isdir(f)
+        # ]
+
+        self.codecs = [audio_dir + "/opus", audio_dir + "/encodec", audio_dir + "/soundstream"]
 
         self._pad_length_input = 2 ** math.ceil(math.log2(max_duration * input_freq))
         self._pad_length_output = 2 ** math.ceil(math.log2(max_duration * output_freq))
@@ -158,11 +160,11 @@ class SynthDataset(Dataset):
             if base_waveform.shape[0] == 1:
                 base_waveform = base_waveform.repeat(2, 1, 1)
 
-        encoded_compressed_waveform, _, _, _, _ = self.autoencoder.encode(
+        _, _, encoded_compressed_waveform, _, _ = self.autoencoder.encode(
             compressed_waveform
         )
 
-        encoded_base_waveform, codes, _, _, _ = self.autoencoder.encode(base_waveform)
+        _, codes, encoded_base_waveform, _, _ = self.autoencoder.encode(base_waveform)
 
         return (
             encoded_compressed_waveform,

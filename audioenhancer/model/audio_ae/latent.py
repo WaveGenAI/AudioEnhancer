@@ -1,5 +1,5 @@
 """This module contains all the process for the latent space of the audio autoencoder."""
-
+from einops import rearrange
 from torch import nn
 
 from audioenhancer.model.audio_ae.mamba import MambaBlock
@@ -51,11 +51,12 @@ class LatentProcessor(nn.Module):
         super().__init__()
         self.latent_dim = latent_dim
         self.num_layer = num_layer
+        self.num_code_book = num_code_book
         config = LatentConfig(latent_dim, num_layer)
 
         self.in_proj = nn.Linear(in_dim, latent_dim)
         self.out_proj = nn.Linear(latent_dim, out_dim)
-        self.code_proj = nn.Linear(latent_dim, num_code_book)
+        # self.code_book_proj = nn.Linear(latent_dim, num_code_book * 1024)
 
         self.layers = nn.ModuleList()
         for i in range(num_layer):
@@ -65,4 +66,8 @@ class LatentProcessor(nn.Module):
         x = self.in_proj(x)
         for layer in self.layers:
             x = layer(x)
-        return self.out_proj(x), self.code_proj(x)
+        # code = x
+        # code = rearrange(code, "b t c -> (b t) c")
+        # code = self.code_book_proj(code)
+        # code = rearrange(code, "b (t c)-> b t c", t=self.num_code_book, c=1024)
+        return self.out_proj(x), None #code

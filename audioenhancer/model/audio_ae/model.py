@@ -166,9 +166,10 @@ model_xtransformer = ContinuousTransformerWrapper(
     dim_out=1024,
     max_seq_len=0,
     attn_layers=Encoder(
-        dim=1024,
-        depth=16,
-        heads=8,
+        dim=2048,
+        depth=8,
+        heads=16,
+        ff_mult=2,
         attn_flash=True,
         cross_attend=False,
         zero_init_branch_output=True,
@@ -180,9 +181,9 @@ model_xtransformer = ContinuousTransformerWrapper(
 )
 
 mamba_model = LatentProcessor(
-    in_dim=1024,
-    out_dim=1024,
+    in_dim=72,
+    out_dim=72,
     num_code_book=9,
-    latent_dim=2048,
-    num_layer=8,
+    latent_dim=1024,
+    num_layer=12,
 )
