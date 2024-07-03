@@ -1,20 +1,11 @@
-"""
-Code for inference.
-"""
-
 import argparse
+
+import gradio as gr
 
 from audioenhancer.constants import SAMPLING_RATE
 from audioenhancer.inference import Inference
 
 parser = argparse.ArgumentParser()
-parser.add_argument(
-    "--audio",
-    default="../data/test.mp3",
-    type=str,
-    required=False,
-    help="The path to the audio file to enhance",
-)
 
 parser.add_argument(
     "--model_path",
@@ -32,8 +23,23 @@ parser.add_argument(
     help="The sampling rate of the audio",
 )
 
+parser.add_argument(
+    "--share",
+    action="store_true",
+    help="Share the interface",
+    default=False,
+)
+
+
 args = parser.parse_args()
 
-inference = Inference(args.model_path, args.sampling_rate)
+Inference = Inference(args.model_path, args.sampling_rate)
 
-inference.inference(args.audio)
+
+def enhancer(filepath):
+    return Inference.inference(filepath)
+
+
+demo = gr.Interface(enhancer, gr.Audio(type="filepath"), "audio")
+
+demo.launch(share=args.share)
