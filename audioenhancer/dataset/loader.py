@@ -169,5 +169,5 @@ class SynthDataset(Dataset):
         return (
             encoded_compressed_waveform,
             encoded_base_waveform,
-            codes,
+            base_waveform,
         )

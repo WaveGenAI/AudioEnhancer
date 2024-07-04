@@ -7,6 +7,7 @@ import os
 
 import bitsandbytes as bnb
 import torch
+from audiotools import AudioSignal
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
@@ -24,7 +25,8 @@ from audioenhancer.constants import (
     EVAL_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
-from audioenhancer.model.audio_ae.model import model_xtransformer_small as model
+from audioenhancer.model.audio_ae.model import mamba_model as model
+from audioenhancer.model.loss import L1Loss, MultiScaleSTFTLoss, MelSpectrogramLoss, SISDRLoss
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -91,10 +93,11 @@ writer = SummaryWriter()
 
 
 loss_fn = [MSELoss()]
+losses = [L1Loss(), MultiScaleSTFTLoss(), MelSpectrogramLoss()]
 disc_loss_fn = MSELoss()
 
 # split test and train
-test_size = min(len(dataset) * 0.1, 200)
+test_size = min(len(dataset) * 0.1, EVAL_STEPS)
 train_size = len(dataset) - test_size
 
 train_dataset, test_dataset = torch.utils.data.random_split(
@@ -173,6 +176,7 @@ def eval_model(model, test_loader):
     for batch in test_loader:
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
+        base_waveform = batch[2].to(device)
         c, d = x.shape[1], x.shape[2]
 
         # rearrange x and y
@@ -181,8 +185,18 @@ def eval_model(model, test_loader):
         y_hat = model(x, mask=None)
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
+        loss = 0
+        for i in range(y_hat.shape[0]):
+            with torch.no_grad():
+                z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat[i].float(), None)
 
-        loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
+                decoded = dataset.autoencoder.decode(z_q)
+            signal = AudioSignal(decoded, sample_rate=OUTPUT_FREQ)
+            y_signal = AudioSignal(base_waveform[i], sample_rate=OUTPUT_FREQ)
+            loss += sum(loss(signal, y_signal) for loss in losses)
+
+        loss /= y_hat.shape[0]
+        loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss_test += loss.detach().cpu().float().numpy()
 
     return loss_test / len(test_loader)
@@ -198,6 +212,8 @@ for epoch in range(EPOCH):
 
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
+        base_waveform = batch[2].to(device)
+
         c, d = x.shape[1], x.shape[2]
 
         # rearrange x and y
@@ -207,7 +223,18 @@ for epoch in range(EPOCH):
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 
-        loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
+        loss = 0
+        for i in range(y_hat.shape[0]):
+            with torch.no_grad():
+                z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat[i].float(), None)
+
+                decoded = dataset.autoencoder.decode(z_q)
+            signal = AudioSignal(decoded, sample_rate=OUTPUT_FREQ)
+            y_signal = AudioSignal(base_waveform[i], sample_rate=OUTPUT_FREQ)
+            loss += sum(loss(signal, y_signal) for loss in losses)
+
+        loss /= y_hat.shape[0]
+        loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
