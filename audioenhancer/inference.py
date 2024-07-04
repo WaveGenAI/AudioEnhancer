@@ -34,7 +34,7 @@ class Inference:
 
         waveform, sample_rate = torchaudio.load(waveform_path)
         resampler = torchaudio.transforms.Resample(
-            sample_rate, self._sampling_rate, dtype=waveform.dtype
+            sample_rate, self.autoencoder.sample_rate, dtype=waveform.dtype
         )
         waveform = resampler(waveform)
         if waveform.shape[0] == 1:
@@ -69,7 +69,7 @@ class Inference:
                 )
 
             encoded = self.autoencoder.get_condition(
-                chunk.transpose(0, 1), sample_rate=self._sampling_rate
+                chunk.transpose(0, 1), sample_rate=self.autoencoder.sample_rate
             )
 
             # create input for the model
