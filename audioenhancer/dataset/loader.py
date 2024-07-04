@@ -7,9 +7,8 @@ import math
 import os
 import random
 
-import dac
 import torch
-import torchaudio
+from audiocraft.models import MultiBandDiffusion
 from audiotools import AudioSignal
 from audiotools import transforms as tfm
 from torch.utils.data import Dataset
@@ -69,12 +68,9 @@ class SynthDataset(Dataset):
         self._input_freq = input_freq
         self._output_freq = output_freq
 
-        model_path = dac.utils.download(model_type="44khz")
-        self.autoencoder = dac.DAC.load(model_path).to("cuda")
-        self.autoencoder.eval()
-        self.autoencoder.requires_grad_(False)
+        self.autoencoder = MultiBandDiffusion.get_mbd_musicgen()
 
-        self._prob = overall_prob / len(transform)
+        self._prob = overall_prob / (len(transform) + 1)
         self._transform = tfm.Compose([trsfm(prob=self._prob) for trsfm in transform])
 
         self._transform2 = tfm.Compose(
@@ -126,13 +122,8 @@ class SynthDataset(Dataset):
                 compressed_waveform.clone(), **kwargs
             )
 
-        compressed_waveform = self.autoencoder.preprocess(
-            compressed_waveform.audio_data, compressed_waveform.sample_rate
-        )
-
-        base_waveform = self.autoencoder.preprocess(
-            base_waveform.audio_data, base_waveform.sample_rate
-        )
+        compressed_waveform = compressed_waveform.audio_data
+        base_waveform = base_waveform.audio_data
 
         if base_waveform.shape[-1] < self._pad_length_output:
             base_waveform = torch.nn.functional.pad(
@@ -158,16 +149,22 @@ class SynthDataset(Dataset):
             if base_waveform.shape[0] == 1:
                 base_waveform = base_waveform.repeat(2, 1, 1)
 
-        encoded_compressed_waveform, _, _, _, _, _ = self.autoencoder.encode(
-            compressed_waveform
+        if random.random() < self._prob:
+            strength = torch.rand(compressed_waveform.shape[:2]) * 0.01
+            strength_expanded = (
+                strength.unsqueeze(2)
+                .expand(-1, -1, compressed_waveform.shape[2])
+                .cuda()
+            )
+            noise = torch.randn_like(compressed_waveform).cuda()
+            compressed_waveform = compressed_waveform + noise * strength_expanded
+
+        encoded_compressed_waveform = self.autoencoder.get_condition(
+            compressed_waveform, sample_rate=self.autoencoder.sample_rate
         )
 
-        encoded_base_waveform, _, codes, _, _, _ = self.autoencoder.encode(
-            base_waveform
+        encoded_base_waveform = self.autoencoder.get_condition(
+            base_waveform, sample_rate=self.autoencoder.sample_rate
         )
 
-        return (
-            encoded_compressed_waveform,
-            encoded_base_waveform,
-            codes,
-        )
+        return (encoded_compressed_waveform, encoded_base_waveform)

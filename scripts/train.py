@@ -59,7 +59,7 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-dtype = torch.float32
+dtype = torch.bfloat16
 
 # Load the dataset
 dataset = SynthDataset(
@@ -129,7 +129,6 @@ optimizer = bnb.optim.AdamW8bit(
     ],
     lr=1e-4,
     betas=(0.95, 0.999),
-    eps=1e-6,
     weight_decay=1e-3,
 )
 
@@ -157,13 +156,6 @@ scheduler = lr_scheduler.LinearLR(
 
 # print number of parameters
 print(f"Number of parameters: {sum(p.numel() for p in model.parameters()) / 1e6}M")
-
-import dac
-
-autoencoder_path = dac.utils.download(model_type="44khz")
-autoencoder = dac.DAC.load(autoencoder_path).to("cuda")
-autoencoder.eval()
-autoencoder.requires_grad_(False)
 
 
 def eval_model(model, test_loader):

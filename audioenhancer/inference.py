@@ -4,12 +4,12 @@ Code for inference.
 
 import os
 
-import dac
 import torch
 import torchaudio
 from einops import rearrange
 
 from audioenhancer.model.audio_ae.model import model_xtransformer_small as model
+from audiocraft.models import MultiBandDiffusion
 
 
 class Inference:
@@ -22,8 +22,7 @@ class Inference:
 
         self._sampling_rate = sampling_rate
 
-        autoencoder_path = dac.utils.download(model_type="44khz")
-        self._autoencoder = dac.DAC.load(autoencoder_path).to(self.device)
+        self.autoencoder = MultiBandDiffusion.get_mbd_musicgen()
 
     def load(self, waveform_path):
         """
@@ -45,6 +44,7 @@ class Inference:
 
         return waveform.to(self.device)
 
+    @torch.no_grad()
     def inference(self, audio_path: str, chunk_duration: int = 10):
         """Run inference on the given audio file.
 
@@ -68,35 +68,31 @@ class Inference:
                     0,
                 )
 
-            with torch.no_grad():
-                encoded, encoded_q, _, _, _, _ = self._autoencoder.encode(
-                    chunk.transpose(0, 1)
-                )
+            encoded = self.autoencoder.get_condition(
+                chunk.transpose(0, 1), sample_rate=self._sampling_rate
+            )
 
-                # create input for the model
-                decoded = self._autoencoder.decode(encoded_q)
+            # create input for the model
+            decoded = self.autoencoder.generate(encoded)
 
-                decoded = decoded.transpose(0, 1)
+            decoded = decoded.transpose(0, 1)
 
-                ae_input = torch.cat([ae_input, decoded], dim=2)
+            ae_input = torch.cat([ae_input, decoded], dim=2)
 
-                encoded = encoded.unsqueeze(0)
-                c, d = encoded.shape[1], encoded.shape[2]
-                encoded = rearrange(encoded, "b c d t -> b (t c) d")
+            encoded = encoded.unsqueeze(0)
+            c, d = encoded.shape[1], encoded.shape[2]
+            encoded = rearrange(encoded, "b c d t -> b (t c) d")
 
-                pred = self.model(encoded)
+            pred = self.model(encoded)
 
-                pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
-                pred = pred.squeeze(0)
+            pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
+            pred = pred.squeeze(0)
 
-                # quantize
-                z_q, _, _, _, _ = self._autoencoder.quantizer(pred, None)
+            decoded = self.autoencoder.generate(pred)
 
-                decoded = self._autoencoder.decode(z_q)
+            decoded = decoded.transpose(0, 1)
 
-                decoded = decoded.transpose(0, 1)
-
-                output = torch.cat([output, decoded], dim=2)
+            output = torch.cat([output, decoded], dim=2)
 
         # fix runtime error: numpy
         output = output.squeeze(0).detach().cpu()

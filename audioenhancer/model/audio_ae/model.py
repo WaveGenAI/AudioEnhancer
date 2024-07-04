@@ -15,7 +15,6 @@ from audio_encoders_pytorch import AutoEncoder1d, MelE1d, TanhBottleneck
 from auraloss.freq import MultiResolutionSTFTLoss
 from x_transformers import ContinuousTransformerWrapper, Decoder, Encoder
 
-from audioenhancer.model.audio_ae.latent import LatentProcessor
 from audioenhancer.model.audio_ae.vdiffusion import CustomVDiffusion
 
 model = DiffusionModel(
@@ -162,11 +161,11 @@ model_ae = DiffusionAE(
 )
 
 model_xtransformer = ContinuousTransformerWrapper(
-    dim_in=1024,
-    dim_out=1024,
+    dim_in=128,
+    dim_out=128,
     max_seq_len=0,
     attn_layers=Encoder(
-        dim=1024,
+        dim=128,
         depth=16,
         heads=8,
         attn_flash=True,
@@ -180,13 +179,13 @@ model_xtransformer = ContinuousTransformerWrapper(
 )
 
 model_xtransformer_small = ContinuousTransformerWrapper(
-    dim_in=1024,
-    dim_out=1024,
+    dim_in=128,
+    dim_out=128,
     max_seq_len=0,
     attn_layers=Encoder(
-        dim=1024,
-        depth=12,
-        heads=8,
+        dim=512,
+        depth=18,
+        heads=18,
         attn_flash=True,
         cross_attend=False,
         zero_init_branch_output=True,
@@ -195,12 +194,4 @@ model_xtransformer_small = ContinuousTransformerWrapper(
         ff_glu=True,
         use_scalenorm=True,
     ),
-)
-
-mamba_model = LatentProcessor(
-    in_dim=1024,
-    out_dim=1024,
-    num_code_book=9,
-    latent_dim=2048,
-    num_layer=8,
 )
