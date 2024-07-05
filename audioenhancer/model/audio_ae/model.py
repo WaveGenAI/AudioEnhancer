@@ -202,4 +202,5 @@ mamba_model = LatentProcessor(
     out_dim=1024,
     latent_dim=1024,
     num_layer=6,
+    num_expert=5,
 )

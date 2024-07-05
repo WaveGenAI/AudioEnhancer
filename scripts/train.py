@@ -8,7 +8,7 @@ import os
 import bitsandbytes as bnb
 import torch
 from audiotools import AudioSignal
-from torch.nn import MSELoss
+from torch.nn import MSELoss, CrossEntropyLoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
 from einops import rearrange
@@ -93,11 +93,12 @@ writer = SummaryWriter()
 
 
 loss_fn = [MSELoss()]
+class_loss_fn = CrossEntropyLoss()
 losses = [L1Loss(), MultiScaleSTFTLoss(), MelSpectrogramLoss()]
 disc_loss_fn = MSELoss()
 
 # split test and train
-test_size = min(len(dataset) * 0.1, EVAL_STEPS)
+test_size = min(len(dataset) * 0.1, 100)
 train_size = len(dataset) - test_size
 
 train_dataset, test_dataset = torch.utils.data.random_split(
@@ -130,7 +131,7 @@ optimizer = bnb.optim.AdamW8bit(
     [
         {"params": model.parameters()},
     ],
-    lr=1e-4,
+    lr=5e-5,
     betas=(0.95, 0.999),
     weight_decay=1e-3,
 )
@@ -169,12 +170,13 @@ def eval_model(model, test_loader):
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
         base_waveform = batch[2].to(device)
+        classes = batch[3].to(device).long()
         c, d = x.shape[1], x.shape[2]
 
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")
 
-        y_hat = model(x, mask=None)
+        y_hat, class_logits = model(x, classes)
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
         loss = 0
@@ -188,7 +190,8 @@ def eval_model(model, test_loader):
             loss += sum(loss(signal, y_signal) for loss in losses)
 
         loss /= y_hat.shape[0]
-        loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
+        class_loss = class_loss_fn(class_logits.view(-1, 5), classes.view(-1))
+        loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) + class_loss
         loss_test += loss.detach().cpu().float().numpy()
 
     return loss_test / len(test_loader)
@@ -205,13 +208,16 @@ for epoch in range(EPOCH):
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
         base_waveform = batch[2].to(device)
+        classes = batch[3].to(device).long()
 
         c, d = x.shape[1], x.shape[2]
 
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")
 
-        y_hat = model(x)
+        y_hat, class_logits = model(x, classes)
+
+
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 
@@ -226,7 +232,9 @@ for epoch in range(EPOCH):
             loss += sum(loss(signal, y_signal) for loss in losses)
 
         loss /= y_hat.shape[0]
+        class_loss = class_loss_fn(class_logits.view(-1, 5), classes.view(-1))
         loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
+        class_loss.backward(retain_graph=True)
         loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
@@ -238,7 +246,7 @@ for epoch in range(EPOCH):
         # )
         # logging_desc_loss += disc_loss.detach().cpu().float().numpy()
 
-        logging_loss += loss.detach().cpu().float().numpy()
+        logging_loss += loss.detach().cpu().float().numpy() + class_loss.detach().cpu().float().numpy()
         # loss += disc_pred[: -y.shape[0]].mean().squeeze()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
@@ -275,6 +283,7 @@ for epoch in range(EPOCH):
 
         if step % EVAL_STEPS == 0:
             loss_test = eval_model(model, test_loader)
+            model.train()
             writer.add_scalar("Loss Test", loss_test, step)
             print(f"Test Loss: {loss_test}")
 

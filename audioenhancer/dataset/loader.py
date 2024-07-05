@@ -116,9 +116,15 @@ class SynthDataset(Dataset):
 
         compressed_waveform = compressed_waveform[:, :, : self._pad_length_input]
         base_waveform = base_waveform[:, :, : self._pad_length_output]
-
+        use_transform = False
         if not "hq" in codec:
             kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
+            for trsfm in kwargs['Compose'].values():
+                if isinstance(trsfm, torch.Tensor):
+                    continue
+                if trsfm["mask"].all():
+                    use_transform = True
+                    break
             compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
         else:
             kwargs = self._transform2.instantiate(signal=compressed_waveform.clone())
@@ -166,8 +172,22 @@ class SynthDataset(Dataset):
             base_waveform
         )
 
+        class_id = [0]
+        if "dac" in codec:
+            class_id = [1]
+        elif "encodec" in codec:
+            class_id = [2]
+        elif "opus" in codec:
+            class_id = [3]
+        elif use_transform:
+            class_id = [4]
+
+
+        class_id = torch.tensor(class_id).cuda()
+
         return (
             encoded_compressed_waveform,
             encoded_base_waveform,
             base_waveform,
+            class_id,
         )

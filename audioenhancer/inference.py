@@ -4,6 +4,7 @@ Code for inference.
 
 import os
 
+import dac
 import torch
 import torchaudio
 from einops import rearrange
@@ -68,31 +69,36 @@ class Inference:
                     0,
                 )
 
-            encoded = self.autoencoder.get_condition(
-                chunk.transpose(0, 1), sample_rate=self._sampling_rate
-            )
+            with torch.no_grad():
+                encoded, encoded_q, _, _, _, _ = self._autoencoder.encode(
+                    chunk.transpose(0, 1)
+                )
 
-            # create input for the model
-            decoded = self.autoencoder.generate(encoded)
+                # create input for the model
+                decoded = self._autoencoder.decode(encoded_q)
 
-            decoded = decoded.transpose(0, 1)
+                decoded = decoded.transpose(0, 1)
 
-            ae_input = torch.cat([ae_input, decoded], dim=2)
+                ae_input = torch.cat([ae_input, decoded], dim=2)
 
-            encoded = encoded.unsqueeze(0)
-            c, d = encoded.shape[1], encoded.shape[2]
-            encoded = rearrange(encoded, "b c d t -> b (t c) d")
+                encoded = encoded.unsqueeze(0)
+                c, d = encoded.shape[1], encoded.shape[2]
+                encoded = rearrange(encoded, "b c d t -> b (t c) d")
 
-            pred = self.model(encoded)
+                pred, classes = self.model(encoded)
 
-            pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
-            pred = pred.squeeze(0)
+                pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
+                pred = pred.squeeze(0)
+                print(torch.softmax(classes, dim=-1))
 
-            decoded = self.autoencoder.generate(pred)
+                # quantize
+                z_q, _, _, _, _ = self._autoencoder.quantizer(pred, None)
 
-            decoded = decoded.transpose(0, 1)
+                decoded = self._autoencoder.decode(z_q)
 
-            output = torch.cat([output, decoded], dim=2)
+                decoded = decoded.transpose(0, 1)
+
+                output = torch.cat([output, decoded], dim=2)
 
         # fix runtime error: numpy
         output = output.squeeze(0).detach().cpu()
