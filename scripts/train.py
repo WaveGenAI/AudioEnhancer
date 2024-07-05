@@ -5,28 +5,34 @@ Code for training.
 import argparse
 import os
 
+import schedulefree
+import auraloss
 import bitsandbytes as bnb
 import torch
 from audiotools import AudioSignal
+from einops import rearrange
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
-from einops import rearrange
 
 from audioenhancer.constants import (
     BATCH_SIZE,
     EPOCH,
+    EVAL_STEPS,
     GRADIENT_ACCUMULATION_STEPS,
-    INPUT_FREQ,
     LOGGING_STEPS,
     MAX_AUDIO_LENGTH,
-    OUTPUT_FREQ,
+    SAMPLING_RATE,
     SAVE_STEPS,
-    EVAL_STEPS,
 )
 from audioenhancer.dataset.loader import SynthDataset
-from audioenhancer.model.audio_ae.model import mamba_model as model
-from audioenhancer.model.loss import L1Loss, MultiScaleSTFTLoss, MelSpectrogramLoss, SISDRLoss
+from audioenhancer.model.audio_ae.model import model_xtransformer as model
+from audioenhancer.model.loss import (
+    L1Loss,
+    MelSpectrogramLoss,
+    MultiScaleSTFTLoss,
+    SISDRLoss,
+)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -65,11 +71,7 @@ dtype = torch.bfloat16
 
 # Load the dataset
 dataset = SynthDataset(
-    args.dataset_dir,
-    max_duration=MAX_AUDIO_LENGTH,
-    mono=args.mono,
-    input_freq=INPUT_FREQ,
-    output_freq=OUTPUT_FREQ,
+    args.dataset_dir, max_duration=MAX_AUDIO_LENGTH, mono=args.mono, freq=SAMPLING_RATE
 )
 writer = SummaryWriter()
 
@@ -91,10 +93,8 @@ writer = SummaryWriter()
 #     target = mel_spectrogram_transform(target)
 #     return MSELoss()(logits, target) / 10
 
-
 loss_fn = [MSELoss()]
-losses = [L1Loss(), MultiScaleSTFTLoss(), MelSpectrogramLoss()]
-disc_loss_fn = MSELoss()
+losses = [L1Loss()]
 
 # split test and train
 test_size = min(len(dataset) * 0.1, EVAL_STEPS)
@@ -150,6 +150,10 @@ scheduler = lr_scheduler.LinearLR(
     total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 )
 
+# optimizer = schedulefree.AdamWScheduleFree(
+#     model.parameters(), lr=1e-4, betas=(0.95, 0.999), weight_decay=1e-3
+# )
+
 # disc_scheduler = lr_scheduler.LinearLR(
 #     disc_optimizer,
 #     start_factor=1,
@@ -181,14 +185,16 @@ def eval_model(model, test_loader):
         for i in range(y_hat.shape[0]):
             with torch.no_grad():
                 z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat[i].float(), None)
-
                 decoded = dataset.autoencoder.decode(z_q)
-            signal = AudioSignal(decoded, sample_rate=OUTPUT_FREQ)
-            y_signal = AudioSignal(base_waveform[i], sample_rate=OUTPUT_FREQ)
+
+            signal = AudioSignal(decoded, sample_rate=SAMPLING_RATE)
+            y_signal = AudioSignal(
+                base_waveform[i][:, :, : decoded.shape[-1]], sample_rate=SAMPLING_RATE
+            )
             loss += sum(loss(signal, y_signal) for loss in losses)
 
         loss /= y_hat.shape[0]
-        loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
+        loss = loss + sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) * 0.2
         loss_test += loss.detach().cpu().float().numpy()
 
     return loss_test / len(test_loader)
@@ -219,14 +225,16 @@ for epoch in range(EPOCH):
         for i in range(y_hat.shape[0]):
             with torch.no_grad():
                 z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat[i].float(), None)
-
                 decoded = dataset.autoencoder.decode(z_q)
-            signal = AudioSignal(decoded, sample_rate=OUTPUT_FREQ)
-            y_signal = AudioSignal(base_waveform[i], sample_rate=OUTPUT_FREQ)
+
+            signal = AudioSignal(decoded, sample_rate=SAMPLING_RATE)
+            y_signal = AudioSignal(
+                base_waveform[i][:, :, : decoded.shape[-1]], sample_rate=SAMPLING_RATE
+            )
             loss += sum(loss(signal, y_signal) for loss in losses)
 
         loss /= y_hat.shape[0]
-        loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
+        loss = loss + sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) * 0.2
         loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
@@ -275,6 +283,7 @@ for epoch in range(EPOCH):
 
         if step % EVAL_STEPS == 0:
             loss_test = eval_model(model, test_loader)
+            model.train()
             writer.add_scalar("Loss Test", loss_test, step)
             print(f"Test Loss: {loss_test}")
 

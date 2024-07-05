@@ -23,8 +23,7 @@ class SynthDataset(Dataset):
         audio_dir: str,
         max_duration: int = 10,
         mono: bool = True,
-        input_freq: int = 16000,
-        output_freq: int = 16000,
+        freq: int = 16000,
         transform: list = [
             tfm.CorruptPhase,
             tfm.FrequencyNoise,
@@ -62,12 +61,9 @@ class SynthDataset(Dataset):
             if os.path.isdir(f)
         ]
 
-        self._pad_length_input = 2 ** math.ceil(math.log2(max_duration * input_freq))
-        self._pad_length_output = 2 ** math.ceil(math.log2(max_duration * output_freq))
+        self._cut_length = max_duration * freq
 
         self._mono = mono
-        self._input_freq = input_freq
-        self._output_freq = output_freq
 
         model_path = dac.utils.download(model_type="44khz")
         self.autoencoder = dac.DAC.load(model_path).to("cuda")
@@ -76,10 +72,6 @@ class SynthDataset(Dataset):
 
         self._prob = overall_prob / len(transform)
         self._transform = tfm.Compose([trsfm(prob=self._prob) for trsfm in transform])
-
-        self._transform2 = tfm.Compose(
-            [trsfm(prob=self._prob * 2) for trsfm in transform]
-        )
 
     def __len__(self) -> int:
         """Returns the number of waveforms in the dataset.
@@ -114,37 +106,15 @@ class SynthDataset(Dataset):
         base_waveform = base_waveform.resample(self.autoencoder.sample_rate)
         compressed_waveform = compressed_waveform.resample(self.autoencoder.sample_rate)
 
-        compressed_waveform = compressed_waveform[:, :, : self._pad_length_input]
-        base_waveform = base_waveform[:, :, : self._pad_length_output]
+        kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
+        compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
 
-        if not "hq" in codec:
-            kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
-            compressed_waveform = self._transform(compressed_waveform.clone(), **kwargs)
-        else:
-            kwargs = self._transform2.instantiate(signal=compressed_waveform.clone())
-            compressed_waveform = self._transform2(
-                compressed_waveform.clone(), **kwargs
-            )
+        min_length = min(base_waveform.shape[-1], compressed_waveform.shape[-1])
+        if min_length > self._cut_length:
+            min_length = self._cut_length
 
-        compressed_waveform = self.autoencoder.preprocess(
-            compressed_waveform.audio_data, compressed_waveform.sample_rate
-        )
-
-        base_waveform = self.autoencoder.preprocess(
-            base_waveform.audio_data, base_waveform.sample_rate
-        )
-
-        if base_waveform.shape[-1] < self._pad_length_output:
-            base_waveform = torch.nn.functional.pad(
-                base_waveform,
-                (0, self._pad_length_output - base_waveform.shape[-1]),
-            )
-
-        if compressed_waveform.shape[-1] < self._pad_length_input:
-            compressed_waveform = torch.nn.functional.pad(
-                compressed_waveform,
-                (0, self._pad_length_input - compressed_waveform.shape[-1]),
-            )
+        compressed_waveform = compressed_waveform[:, :, :min_length].audio_data
+        base_waveform = base_waveform[:, :, :min_length].audio_data
 
         compressed_waveform = compressed_waveform.transpose(0, 1).cuda()
         base_waveform = base_waveform.transpose(0, 1).cuda()
@@ -158,13 +128,18 @@ class SynthDataset(Dataset):
             if base_waveform.shape[0] == 1:
                 base_waveform = base_waveform.repeat(2, 1, 1)
 
+        compressed_waveform = torch.nn.functional.pad(
+            compressed_waveform, (0, self._cut_length - compressed_waveform.shape[-1])
+        )
+        base_waveform = torch.nn.functional.pad(
+            base_waveform, (0, self._cut_length - base_waveform.shape[-1])
+        )
+
         encoded_compressed_waveform, _, _, _, _, _ = self.autoencoder.encode(
             compressed_waveform
         )
 
-        encoded_base_waveform, _, codes, _, _, _ = self.autoencoder.encode(
-            base_waveform
-        )
+        encoded_base_waveform, _, _, _, _, _ = self.autoencoder.encode(base_waveform)
 
         return (
             encoded_compressed_waveform,
