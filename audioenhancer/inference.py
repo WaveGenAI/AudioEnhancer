@@ -11,6 +11,41 @@ from einops import rearrange
 
 from audioenhancer.model.audio_ae.model import model_xtransformer as model
 
+import librosa
+import numpy as np
+from scipy.signal import butter, filtfilt
+import soundfile as sf
+
+
+def remove_noise(audio_path, output_path):
+    # Charger le fichier audio
+    y, sr = librosa.load(audio_path)
+
+    # Calculer le RMS (Root Mean Square) du signal original
+    rms_original = np.sqrt(np.mean(y**2))
+
+    # Définir les paramètres du filtre passe-bas
+    cutoff = 7000  # Fréquence de coupure à 7000 Hz
+    order = 2  # Ordre du filtre à 2
+    nyquist = 0.5 * sr
+    normal_cutoff = cutoff / nyquist
+
+    # Créer le filtre passe-bas
+    b, a = butter(order, normal_cutoff, btype="low", analog=False)
+
+    # Appliquer le filtre
+    y_filtered = filtfilt(b, a, y)
+
+    # Mélanger le signal original et le signal filtré
+    y_output = 0.85 * y + 0.15 * y_filtered  # 85% original, 15% filtré
+
+    # Normaliser le volume du signal de sortie
+    rms_output = np.sqrt(np.mean(y_output**2))
+    y_output = y_output * (rms_original / rms_output)
+
+    # Sauvegarder le résultat
+    sf.write(output_path, y_output, sr)
+
 
 class Inference:
     def __init__(self, model_path: str, sampling_rate: int):
@@ -112,7 +147,9 @@ class Inference:
             channels_first=False,
         )
         torchaudio.save(
-            "./data/output.mp3", output.T, self._sampling_rate, channels_first=False
+            "./data/output1.mp3", output.T, self._sampling_rate, channels_first=False
         )
+
+        # remove_noise("./data/output1.mp3", "./data/output.mp3")
 
         return os.path.abspath("./data/output.mp3")

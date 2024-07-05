@@ -5,10 +5,11 @@ Code for training.
 import argparse
 import os
 
-import schedulefree
 import auraloss
 import bitsandbytes as bnb
+import schedulefree
 import torch
+import torch.nn as nn
 from audiotools import AudioSignal
 from einops import rearrange
 from torch.nn import MSELoss
@@ -94,7 +95,7 @@ writer = SummaryWriter()
 #     return MSELoss()(logits, target) / 10
 
 loss_fn = [MSELoss()]
-losses = [L1Loss()]
+losses = [nn.L1Loss()]
 
 # split test and train
 test_size = min(len(dataset) * 0.1, EVAL_STEPS)
@@ -181,7 +182,7 @@ def eval_model(model, test_loader):
         y_hat = model(x, mask=None)
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
-        loss = 0
+        loss_total = 0
         for i in range(y_hat.shape[0]):
             with torch.no_grad():
                 z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat[i].float(), None)
@@ -191,11 +192,16 @@ def eval_model(model, test_loader):
             y_signal = AudioSignal(
                 base_waveform[i][:, :, : decoded.shape[-1]], sample_rate=SAMPLING_RATE
             )
-            loss += sum(loss(signal, y_signal) for loss in losses)
 
-        loss /= y_hat.shape[0]
-        loss = loss + sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) * 0.2
-        loss_test += loss.detach().cpu().float().numpy()
+            for loss in losses:
+                out = loss(signal.audio_data.cpu(), y_signal.audio_data.cpu())
+                loss_total += out
+
+        loss_total /= y_hat.shape[0]
+        loss_total = (
+            loss_total + sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) * 0
+        )
+        loss_test += loss_total.detach().cpu().float().numpy()
 
     return loss_test / len(test_loader)
 
@@ -221,7 +227,7 @@ for epoch in range(EPOCH):
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
 
-        loss = 0
+        loss_total = 0
         for i in range(y_hat.shape[0]):
             with torch.no_grad():
                 z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat[i].float(), None)
@@ -231,11 +237,16 @@ for epoch in range(EPOCH):
             y_signal = AudioSignal(
                 base_waveform[i][:, :, : decoded.shape[-1]], sample_rate=SAMPLING_RATE
             )
-            loss += sum(loss(signal, y_signal) for loss in losses)
 
-        loss /= y_hat.shape[0]
-        loss = loss + sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) * 0.2
-        loss.backward()
+            for loss in losses:
+                out = loss(signal.audio_data.cpu(), y_signal.audio_data.cpu())
+                loss_total += out
+
+        loss_total /= y_hat.shape[0]
+        loss_total = (
+            loss_total + sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) * 0
+        )
+        loss_total.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
         # disc_pred = discriminator(batch_disc)
@@ -246,7 +257,7 @@ for epoch in range(EPOCH):
         # )
         # logging_desc_loss += disc_loss.detach().cpu().float().numpy()
 
-        logging_loss += loss.detach().cpu().float().numpy()
+        logging_loss += loss_total.detach().cpu().float().numpy()
         # loss += disc_pred[: -y.shape[0]].mean().squeeze()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
