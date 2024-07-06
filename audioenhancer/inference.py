@@ -37,7 +37,7 @@ def remove_noise(audio_path, output_path):
     y_filtered = filtfilt(b, a, y)
 
     # Mélanger le signal original et le signal filtré
-    y_output = 0.85 * y + 0.15 * y_filtered  # 85% original, 15% filtré
+    y_output = y_filtered  # 85% original, 15% filtré
 
     # Normaliser le volume du signal de sortie
     rms_output = np.sqrt(np.mean(y_output**2))
@@ -59,6 +59,8 @@ class Inference:
 
         autoencoder_path = dac.utils.download(model_type="44khz")
         self._autoencoder = dac.DAC.load(autoencoder_path).to(self.device)
+        self._autoencoder.eval()
+        self._autoencoder.requires_grad_(False)
 
     def load(self, waveform_path):
         """
@@ -80,7 +82,7 @@ class Inference:
 
         return waveform.to(self.device)
 
-    def inference(self, audio_path: str, chunk_duration: int = 3):
+    def inference(self, audio_path: str, chunk_duration: int = 4):
         """Run inference on the given audio file.
 
         Args:
@@ -147,9 +149,9 @@ class Inference:
             channels_first=False,
         )
         torchaudio.save(
-            "./data/output1.mp3", output.T, self._sampling_rate, channels_first=False
+            "./data/output.mp3", output.T, self._sampling_rate, channels_first=False
         )
 
-        # remove_noise("./data/output1.mp3", "./data/output.mp3")
+        # remove_noise("./data/output.mp3", "./data/output.mp3")
 
         return os.path.abspath("./data/output.mp3")

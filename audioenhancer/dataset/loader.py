@@ -66,9 +66,9 @@ class SynthDataset(Dataset):
         self._mono = mono
 
         model_path = dac.utils.download(model_type="44khz")
-        self.autoencoder = dac.DAC.load(model_path).to("cuda")
-        self.autoencoder.eval()
-        self.autoencoder.requires_grad_(False)
+        self.autoencoder = dac.DAC.load(model_path).to("cuda", dtype=torch.float32)
+        for param in self.autoencoder.parameters():
+            param.requires_grad = False
 
         self._prob = overall_prob / len(transform)
         self._transform = tfm.Compose([trsfm(prob=self._prob) for trsfm in transform])
@@ -140,7 +140,7 @@ class SynthDataset(Dataset):
         )
 
         encoded_base_waveform, _, _, _, _, _ = self.autoencoder.encode(base_waveform)
-
+        base_waveform = self.autoencoder.decode(encoded_base_waveform)
         return (
             encoded_compressed_waveform,
             encoded_base_waveform,

@@ -5,12 +5,9 @@ Code for training.
 import argparse
 import os
 
-import auraloss
 import bitsandbytes as bnb
-import schedulefree
 import torch
 import torch.nn as nn
-from audiotools import AudioSignal
 from einops import rearrange
 from torch.nn import MSELoss
 from torch.optim import lr_scheduler
@@ -28,12 +25,6 @@ from audioenhancer.constants import (
 )
 from audioenhancer.dataset.loader import SynthDataset
 from audioenhancer.model.audio_ae.model import model_xtransformer as model
-from audioenhancer.model.loss import (
-    L1Loss,
-    MelSpectrogramLoss,
-    MultiScaleSTFTLoss,
-    SISDRLoss,
-)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -68,7 +59,6 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-dtype = torch.bfloat16
 
 # Load the dataset
 dataset = SynthDataset(
@@ -94,8 +84,7 @@ writer = SummaryWriter()
 #     target = mel_spectrogram_transform(target)
 #     return MSELoss()(logits, target) / 10
 
-loss_fn = [MSELoss()]
-losses = [nn.L1Loss()]
+losses = nn.L1Loss()
 
 # split test and train
 test_size = min(len(dataset) * 0.1, EVAL_STEPS)
@@ -111,6 +100,7 @@ train_loader = torch.utils.data.DataLoader(
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+dtype = torch.float32
 
 if os.path.exists(args.base_model_path):
     model.load_state_dict(torch.load(args.base_model_path))
@@ -170,38 +160,30 @@ def eval_model(model, test_loader):
     model.eval()
     loss_test = 0
 
-    for batch in test_loader:
+    for batch in train_loader:
         x = batch[0].to(device, dtype=dtype)
-        y = batch[1].to(device, dtype=dtype)
-        base_waveform = batch[2].to(device)
+        base_waveform = batch[2].to(device, dtype=dtype).squeeze(0)
+
         c, d = x.shape[1], x.shape[2]
 
-        # rearrange x and y
+        # Réarrangement de x
         x = rearrange(x, "b c d t -> b (t c) d")
 
-        y_hat = model(x, mask=None)
+        # Prédiction du modèle
+        y_hat = model(x)
 
-        y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
-        loss_total = 0
-        for i in range(y_hat.shape[0]):
-            with torch.no_grad():
-                z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat[i].float(), None)
-                decoded = dataset.autoencoder.decode(z_q)
+        # Réarrangement de y_hat
+        y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d).squeeze(0)
 
-            signal = AudioSignal(decoded, sample_rate=SAMPLING_RATE)
-            y_signal = AudioSignal(
-                base_waveform[i][:, :, : decoded.shape[-1]], sample_rate=SAMPLING_RATE
-            )
+        z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat, None)
 
-            for loss in losses:
-                out = loss(signal.audio_data.cpu(), y_signal.audio_data.cpu())
-                loss_total += out
+        # Décodage sans conversion en flottant
+        decoded = dataset.autoencoder.decode(z_q)
 
-        loss_total /= y_hat.shape[0]
-        loss_total = (
-            loss_total + sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) * 0
-        )
-        loss_test += loss_total.detach().cpu().float().numpy()
+        # Calcul de la perte
+        loss_test += losses(decoded, base_waveform)
+
+        loss_test += loss_test.detach().cpu().float().numpy()
 
     return loss_test / len(test_loader)
 
@@ -215,38 +197,30 @@ for epoch in range(EPOCH):
         step += 1
 
         x = batch[0].to(device, dtype=dtype)
-        y = batch[1].to(device, dtype=dtype)
-        base_waveform = batch[2].to(device)
+        base_waveform = batch[2].to(device, dtype=dtype).squeeze(0)
 
         c, d = x.shape[1], x.shape[2]
 
-        # rearrange x and y
+        # Réarrangement de x
         x = rearrange(x, "b c d t -> b (t c) d")
 
+        # Prédiction du modèle
         y_hat = model(x)
 
-        y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
+        # Réarrangement de y_hat
+        y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d).squeeze(0)
 
-        loss_total = 0
-        for i in range(y_hat.shape[0]):
-            with torch.no_grad():
-                z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat[i].float(), None)
-                decoded = dataset.autoencoder.decode(z_q)
+        z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat, None)
 
-            signal = AudioSignal(decoded, sample_rate=SAMPLING_RATE)
-            y_signal = AudioSignal(
-                base_waveform[i][:, :, : decoded.shape[-1]], sample_rate=SAMPLING_RATE
-            )
+        # Décodage sans conversion en flottant
+        decoded = dataset.autoencoder.decode(z_q)
 
-            for loss in losses:
-                out = loss(signal.audio_data.cpu(), y_signal.audio_data.cpu())
-                loss_total += out
+        # Calcul de la perte
+        loss = losses(decoded, base_waveform)
+        loss /= GRADIENT_ACCUMULATION_STEPS
 
-        loss_total /= y_hat.shape[0]
-        loss_total = (
-            loss_total + sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))]) * 0
-        )
-        loss_total.backward()
+        # Calcul des gradients
+        loss.backward()
 
         # batch_disc = torch.cat([y, y_hat], dim=0)
         # disc_pred = discriminator(batch_disc)
@@ -257,15 +231,11 @@ for epoch in range(EPOCH):
         # )
         # logging_desc_loss += disc_loss.detach().cpu().float().numpy()
 
-        logging_loss += loss_total.detach().cpu().float().numpy()
+        logging_loss += loss.detach().cpu().float().numpy()
         # loss += disc_pred[: -y.shape[0]].mean().squeeze()
 
         if (step % GRADIENT_ACCUMULATION_STEPS) == 0:
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1)
-
-            for name, param in model.named_parameters():
-                if param.grad is not None:
-                    param.grad /= GRADIENT_ACCUMULATION_STEPS
 
             optimizer.step()
             optimizer.zero_grad()
