@@ -140,7 +140,8 @@ class SynthDataset(Dataset):
         )
 
         encoded_base_waveform, _, _, _, _, _ = self.autoencoder.encode(base_waveform)
-        base_waveform = self.autoencoder.decode(encoded_base_waveform)
+        base_waveform = self.autoencoder.decoder(encoded_base_waveform)
+
         return (
             encoded_compressed_waveform,
             encoded_base_waveform,
