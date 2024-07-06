@@ -160,7 +160,7 @@ def eval_model(model, test_loader):
     model.eval()
     loss_test = 0
 
-    for batch in train_loader:
+    for batch in test_loader:
         x = batch[0].to(device, dtype=dtype)
         base_waveform = batch[2].to(device, dtype=dtype).squeeze(0)
 
@@ -175,15 +175,14 @@ def eval_model(model, test_loader):
         # Réarrangement de y_hat
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d).squeeze(0)
 
-        z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat, None)
+        with torch.no_grad():
+            z_q, _, _, _, _ = dataset.autoencoder.quantizer(y_hat, None)
 
-        # Décodage sans conversion en flottant
-        decoded = dataset.autoencoder.decode(z_q)
+            # Décodage sans conversion en flottant
+            decoded = dataset.autoencoder.decode(z_q)
 
         # Calcul de la perte
         loss_test += losses(decoded, base_waveform)
-
-        loss_test += loss_test.detach().cpu().float().numpy()
 
     return loss_test / len(test_loader)
 
@@ -263,7 +262,7 @@ for epoch in range(EPOCH):
             # torch.save(discriminator.state_dict(), args.model_path + f"disc_{step}.pt")
 
         if step % EVAL_STEPS == 0:
-            loss_test = eval_model(model, test_loader)
+            loss_test = eval_model(model, test_loader).detach().cpu().float().numpy()
             model.train()
             writer.add_scalar("Loss Test", loss_test, step)
             print(f"Test Loss: {loss_test}")
