@@ -9,8 +9,7 @@ import torch
 import torchaudio
 from einops import rearrange
 
-from audioenhancer.model.audio_ae.model import model_xtransformer_small as model
-from audiocraft.models import MultiBandDiffusion
+from audioenhancer.model.audio_ae.model import mamba_model as model
 
 
 class Inference:
@@ -23,7 +22,8 @@ class Inference:
 
         self._sampling_rate = sampling_rate
 
-        self.autoencoder = MultiBandDiffusion.get_mbd_musicgen()
+        autoencoder_path = dac.utils.download(model_type="44khz")
+        self._autoencoder = dac.DAC.load(autoencoder_path).to(self.device)
 
     def load(self, waveform_path):
         """
@@ -45,8 +45,7 @@ class Inference:
 
         return waveform.to(self.device)
 
-    @torch.no_grad()
-    def inference(self, audio_path: str, chunk_duration: int = 10):
+    def inference(self, audio_path: str, chunk_duration: int = 5):
         """Run inference on the given audio file.
 
         Args:
@@ -85,11 +84,10 @@ class Inference:
                 c, d = encoded.shape[1], encoded.shape[2]
                 encoded = rearrange(encoded, "b c d t -> b (t c) d")
 
-                pred, classes = self.model(encoded)
+                pred = self.model(encoded, None)
 
                 pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
                 pred = pred.squeeze(0)
-                print(torch.softmax(classes, dim=-1))
 
                 # quantize
                 z_q, _, _, _, _ = self._autoencoder.quantizer(pred, None)
@@ -117,4 +115,6 @@ class Inference:
             "./data/output.mp3", output.T, self._sampling_rate, channels_first=False
         )
 
+        print(f"Audio saved at {os.path.abspath('./data/output.mp3')}")
         return os.path.abspath("./data/output.mp3")
+

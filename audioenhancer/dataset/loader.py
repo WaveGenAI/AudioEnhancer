@@ -36,7 +36,7 @@ class SynthDataset(Dataset):
             tfm.Smoothing,
             tfm.TimeNoise,
         ],
-        overall_prob: float = 0.5,
+        overall_prob: float = 0.25,
     ):
         """Initializes the dataset.
 
@@ -62,6 +62,8 @@ class SynthDataset(Dataset):
             if os.path.isdir(f)
         ]
 
+        self.codecs += [audio_dir,]
+
         self._pad_length_input = 2 ** math.ceil(math.log2(max_duration * input_freq))
         self._pad_length_output = 2 ** math.ceil(math.log2(max_duration * output_freq))
 
@@ -78,7 +80,7 @@ class SynthDataset(Dataset):
         self._transform = tfm.Compose([trsfm(prob=self._prob) for trsfm in transform])
 
         self._transform2 = tfm.Compose(
-            [trsfm(prob=self._prob * 2) for trsfm in transform]
+            [trsfm(prob=1) for trsfm in transform]
         )
 
     def __len__(self) -> int:
@@ -116,8 +118,8 @@ class SynthDataset(Dataset):
 
         compressed_waveform = compressed_waveform[:, :, : self._pad_length_input]
         base_waveform = base_waveform[:, :, : self._pad_length_output]
-        use_transform = False
-        if not "hq" in codec:
+        # use_transform = False
+        if not codec.endswith("dataset"):
             kwargs = self._transform.instantiate(signal=compressed_waveform.clone())
             for trsfm in kwargs['Compose'].values():
                 if isinstance(trsfm, torch.Tensor):
@@ -168,26 +170,26 @@ class SynthDataset(Dataset):
             compressed_waveform
         )
 
-        encoded_base_waveform, _, codes, _, _, _ = self.autoencoder.encode(
+        encoded_base_waveform, _, _, _, _, _ = self.autoencoder.encode(
             base_waveform
         )
 
-        class_id = [0]
-        if "dac" in codec:
-            class_id = [1]
-        elif "encodec" in codec:
-            class_id = [2]
-        elif "opus" in codec:
-            class_id = [3]
-        elif use_transform:
-            class_id = [4]
+        noisy_waveform = torch.zeros_like(encoded_compressed_waveform)
+        for i in range(encoded_compressed_waveform.shape[1]):
+            if random.random() < 0.3:
+                noisy_waveform[:, i] = encoded_compressed_waveform[:, i]
+            else:
+                noisy_waveform[:, i] = encoded_base_waveform[:, i]
 
+        # class_id = [0]
+        # if "dac" in codec or "encodec" in codec or "opus" in codec or use_transform:
+        #     class_id = [1]
 
-        class_id = torch.tensor(class_id).cuda()
+        # class_id = torch.tensor(class_id).cuda()
 
         return (
-            encoded_compressed_waveform,
+            noisy_waveform,
             encoded_base_waveform,
             base_waveform,
-            class_id,
+            # class_id,
         )

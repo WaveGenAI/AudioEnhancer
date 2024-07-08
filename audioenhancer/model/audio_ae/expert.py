@@ -10,6 +10,7 @@ class Expert(nn.Module):
     def __init__(self, num_mamba_layer: nn.Module, num_expert, config):
         super().__init__()
         self.experts = nn.ModuleList()
+        self.num_expert = num_expert
         for _ in range(num_expert - 1):
             layers = nn.Sequential()
             for i in range(num_mamba_layer):
@@ -24,7 +25,7 @@ class Expert(nn.Module):
             out = []
             for i, expert_idx in enumerate(expert_id):
                 if random.random() < 0.1:
-                    expert_idx = random.randint(1, 4)
+                    expert_idx = random.randint(0, self.num_expert - 1)
                 if expert_idx == 0:
                     out.append(x[i])
                 else:

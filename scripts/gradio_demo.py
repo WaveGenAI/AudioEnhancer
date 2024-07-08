@@ -11,7 +11,7 @@ parser.add_argument(
     "--model_path",
     type=str,
     required=False,
-    default="data/model/model_600.pt",
+    default="data/model/model_1000.pt",
     help="The path to the model",
 )
 
@@ -27,7 +27,7 @@ parser.add_argument(
     "--share",
     action="store_true",
     help="Share the interface",
-    default=False,
+    default=True,
 )
 
 

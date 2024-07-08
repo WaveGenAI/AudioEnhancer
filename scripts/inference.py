@@ -10,7 +10,7 @@ from audioenhancer.inference import Inference
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--audio",
-    default="../data/test.mp3",
+    default="../media/works/dataset/opus/5700_part2.mp3",  # ../media/works/dataset/dac/5700_part2.mp3
     type=str,
     required=False,
     help="The path to the audio file to enhance",
@@ -20,7 +20,7 @@ parser.add_argument(
     "--model_path",
     type=str,
     required=False,
-    default="data/model/model_2000.pt",
+    default="data/model/model_300.pt",
     help="The path to the model",
 )
 
