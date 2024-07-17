@@ -10,15 +10,21 @@ import torchaudio
 from einops import rearrange
 
 from audioenhancer.model.audio_ae.model import mamba_model as model
+from audioenhancer.model.audio_ae.model import disc_model as disc_model
 
 
 class Inference:
     def __init__(self, model_path: str, sampling_rate: int):
         self.model = model
+        self.disc_model = disc_model
         self.device = torch.device("cuda")
         self.model = self.model.to(self.device)
         self.model.load_state_dict(torch.load(model_path))
         self.model.eval()
+
+        # self.disc_model = self.disc_model.to(self.device)
+        # self.disc_model.load_state_dict(torch.load("data/model/disc_model_1400.pt"))
+        # self.disc_model.eval()
 
         self._sampling_rate = sampling_rate
 
@@ -84,7 +90,14 @@ class Inference:
                 c, d = encoded.shape[1], encoded.shape[2]
                 encoded = rearrange(encoded, "b c d t -> b (t c) d")
 
-                pred = self.model(encoded, None)
+                noise_level = torch.tensor([10]).to(self.device)
+                for i in range(1, 15):
+                    pred, _ = self.model(encoded, None, False, None)
+                    # _, logits = self.disc_model(pred, None, True, None)
+                    noise_level -= 1
+                    print(f"Noise level: {noise_level.item()}")
+                    if noise_level == 0:
+                        break
 
                 pred = rearrange(pred, "b (t c) d -> b c d t", c=c, d=d)
                 pred = pred.squeeze(0)

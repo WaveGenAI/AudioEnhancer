@@ -212,7 +212,8 @@ class MambaBlock(nn.Module):
         self.mixer_rev = MambaMixer(config)
         # self.mlp = MLP(config)
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states, gen_noise):
+        bzs, _ , h_dim = hidden_states.shape
         residual = hidden_states
         hidden_states = self.norm(hidden_states)
         if self.residual_in_fp32:
@@ -223,11 +224,17 @@ class MambaBlock(nn.Module):
             self.mixer_rev.to(torch.float32)
 
         out = self.mixer(hidden_states)
-        out_rev = self.mixer_rev(
-            hidden_states.flip(dims=(1,))
-        ).flip(dims=(1,))
-        hidden_states = out + out_rev
-
+        if gen_noise:
+            out_rev = self.mixer_rev(
+                hidden_states.flip(dims=(1,))[..., 1:, :]
+            ).flip(dims=(1,))
+            hidden_states = out + torch.cat(
+                [out_rev, torch.zeros([bzs, 1, h_dim]).to(device=out.device, dtype=out.dtype)],
+                dim=1
+            )
+        else:
+            out_rev = self.mixer_rev(hidden_states.flip(dims=(1,))).flip(dims=(1,))
+            hidden_states = out + out_rev
         if self.residual_in_fp32:
             hidden_states = hidden_states.to(original_dtype)
             residual = residual.to(original_dtype)

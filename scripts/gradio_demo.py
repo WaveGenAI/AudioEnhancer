@@ -11,7 +11,7 @@ parser.add_argument(
     "--model_path",
     type=str,
     required=False,
-    default="data/model/model_1000.pt",
+    default="data/model/model_3700.pt",
     help="The path to the model",
 )
 

@@ -4,11 +4,11 @@ Code for training.
 
 import argparse
 import os
+import random
 
 import bitsandbytes as bnb
 import torch
 from audiotools import AudioSignal
-from torch.cuda.amp import autocast
 from torch.nn import MSELoss, CrossEntropyLoss
 from torch.optim import lr_scheduler
 from torch.utils.checkpoint import checkpoint
@@ -51,7 +51,7 @@ parser.add_argument(
     "--base_model_path",
     type=str,
     required=False,
-    default="data/model/model_300x.pt",
+    default="data/model/model_500.pt",
     help="Relative path to the base model",
 )
 
@@ -110,7 +110,7 @@ train_dataset, test_dataset = torch.utils.data.random_split(
 train_loader = torch.utils.data.DataLoader(
     train_dataset, batch_size=BATCH_SIZE, shuffle=True
 )
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=2, shuffle=False)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -134,7 +134,7 @@ optimizer = bnb.optim.AdamW8bit(
     [
         {"params": model.parameters()},
     ],
-    lr=5e-5,
+    lr=3e-5,
     betas=(0.95, 0.999),
     weight_decay=1e-3,
 )
@@ -149,8 +149,8 @@ optimizer = bnb.optim.AdamW8bit(
 
 scheduler = lr_scheduler.LinearLR(
     optimizer,
-    start_factor=0.78,
-    end_factor=1e-6,
+    start_factor=0.45,
+    end_factor=1e-8,
     total_iters=train_size * EPOCH // (GRADIENT_ACCUMULATION_STEPS * BATCH_SIZE),
 )
 
@@ -176,13 +176,15 @@ def decode(y_hate, base_waveform):
 def eval_model(model, test_loader):
     model.eval()
     loss_test = 0
+    loss_base = 0
 
     for batch in test_loader:
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
         base_waveform = batch[2].to(device)
-        # classes = batch[3].to(device).long()
+        noise_label = batch[3].to(device).long()
         c, d = x.shape[1], x.shape[2]
+
 
         # rearrange x and y
         x = rearrange(x, "b c d t -> b (t c) d")
@@ -192,9 +194,10 @@ def eval_model(model, test_loader):
         # class_loss = class_loss_fn(class_logits.view(-1, 2), classes.view(-1))
         # weight = torch.softmax(class_logits, dim=-1).detach()
 
-        y_hat = model(x, None)
+        y_hat, _ = model(x, None, False, None)
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
+        y_base = rearrange(x, "b (t c) d -> b c d t", c=c, d=d)
         loss = 0
         # for i in range(y_hat.shape[0]):
         #
@@ -208,8 +211,9 @@ def eval_model(model, test_loader):
         # loss /= y_hat.shape[0]
         loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
         loss_test += loss.detach().cpu().float().numpy()
+        loss_base += sum([loss_fn[i](y_hat, y_base) for i in range(len(loss_fn))]).detach().cpu().float().numpy()
 
-    return loss_test / len(test_loader)
+    return loss_test / len(test_loader), loss_base / len(test_loader)
 
 
 step = 0
@@ -226,7 +230,7 @@ for epoch in range(EPOCH):
         x = batch[0].to(device, dtype=dtype)
         y = batch[1].to(device, dtype=dtype)
         base_waveform = batch[2].to(device)
-        # classes = batch[3].to(device).long()
+        noise_label = batch[3].to(device).long()
 
         c, d = x.shape[1], x.shape[2]
 
@@ -238,9 +242,11 @@ for epoch in range(EPOCH):
         # class_loss = class_loss_fn(class_logits.view(-1, 2), classes.view(-1))
         # class_loss.backward()
         # weight = torch.softmax(class_logits, dim=-1).detach()
-        y_hat = model(x, None)
+        # gen_noise = random.random() < 0.5
+        y_hat, _ = model(x, None, False, None)
 
         y_hat = rearrange(y_hat, "b (t c) d -> b c d t", c=c, d=d)
+        y_base = rearrange(x, "b (t c) d -> b c d t", c=c, d=d)
 
         loss = 0
         # for i in range(y_hat.shape[0]):
@@ -249,8 +255,15 @@ for epoch in range(EPOCH):
         #     loss += sum(loss(signal, y_signal) for loss in losses)
 
         # loss /= y_hat.shape[0]
-        loss += sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
-        loss.backward()
+        base_loss = sum([loss_fn[i](y_hat, y_base) for i in range(len(loss_fn))])
+        loss = sum([loss_fn[i](y_hat, y) for i in range(len(loss_fn))])
+        if loss > base_loss:
+            real_loss = loss - (base_loss * 0.5)
+        elif loss > base_loss*0.8:
+            real_loss = loss - (base_loss * 0.25)
+        else:
+            real_loss = loss
+        real_loss.backward()
         # loss += class_loss
 
 
@@ -289,6 +302,7 @@ for epoch in range(EPOCH):
                 # f" Desc Loss {round(logging_desc_loss / LOGGING_STEPS, 4)}"
                 f" LR {round(scheduler.get_last_lr()[0], 8)}"
             )
+            # print(noise_loss.detach().cpu().float().numpy())
             # print("Class Loss", class_loss.detach().cpu().float().numpy())
             logging_loss = 0
             logging_desc_loss = 0
@@ -301,10 +315,10 @@ for epoch in range(EPOCH):
 
         if step % EVAL_STEPS == 0:
             with torch.no_grad():
-                loss_test = eval_model(model, test_loader)
+                loss_test, loss_base = eval_model(model, test_loader)
             model.train()
             writer.add_scalar("Loss Test", loss_test, step)
-            print(f"Test Loss: {loss_test}")
+            print(f"Test Loss: {loss_test}, Base Loss: {loss_base}")
 
 
 print("Training done")

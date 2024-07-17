@@ -16,6 +16,7 @@ from auraloss.freq import MultiResolutionSTFTLoss
 from x_transformers import ContinuousTransformerWrapper, Decoder, Encoder
 
 from audioenhancer.model.audio_ae.latent import LatentProcessor
+from audioenhancer.model.audio_ae.transformer import Transformer
 from audioenhancer.model.audio_ae.vdiffusion import CustomVDiffusion
 
 model = DiffusionModel(
@@ -197,10 +198,25 @@ model_xtransformer_small = ContinuousTransformerWrapper(
     ),
 )
 
+transformer = Transformer(
+    in_dim=1024,
+    out_dim=1024,
+    latent_dim=1024,
+    num_layer=6,
+)
+
 mamba_model = LatentProcessor(
     in_dim=1024,
     out_dim=1024,
     latent_dim=2048,
     num_layer=6,
-    num_expert=1,
+    noise_grad=11,
+)
+
+disc_model = LatentProcessor(
+    in_dim=1024,
+    out_dim=1024,
+    latent_dim=2048,
+    num_layer=6,
+    noise_grad=11,
 )

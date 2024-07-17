@@ -62,7 +62,6 @@ class SynthDataset(Dataset):
             if os.path.isdir(f)
         ]
 
-        self.codecs += [audio_dir,]
 
         self._pad_length_input = 2 ** math.ceil(math.log2(max_duration * input_freq))
         self._pad_length_output = 2 ** math.ceil(math.log2(max_duration * output_freq))
@@ -174,22 +173,27 @@ class SynthDataset(Dataset):
             base_waveform
         )
 
-        noisy_waveform = torch.zeros_like(encoded_compressed_waveform)
-        for i in range(encoded_compressed_waveform.shape[1]):
-            if random.random() < 0.3:
-                noisy_waveform[:, i] = encoded_compressed_waveform[:, i]
-            else:
-                noisy_waveform[:, i] = encoded_base_waveform[:, i]
+        noise = encoded_base_waveform - encoded_compressed_waveform
+        noise_levels = []
+        noise_level = random.random()
+        encoded_compressed_waveform[:] = encoded_base_waveform[:] + noise[:] * noise_level
+        if noise_level <= 0.10:
+            t_noise_level = 0
+        else:
+            t_noise_level = noise_level - 0.10
+        encoded_base_waveform[:] = encoded_base_waveform[:] + noise[:] * t_noise_level
+        noise_levels.append(t_noise_level)
+
 
         # class_id = [0]
         # if "dac" in codec or "encodec" in codec or "opus" in codec or use_transform:
         #     class_id = [1]
 
-        # class_id = torch.tensor(class_id).cuda()
+        noise_levels = torch.tensor(noise_levels)
 
         return (
-            noisy_waveform,
+            encoded_compressed_waveform,
             encoded_base_waveform,
             base_waveform,
-            # class_id,
+            noise_levels,
         )

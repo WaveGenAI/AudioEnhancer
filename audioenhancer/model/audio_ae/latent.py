@@ -1,6 +1,9 @@
 """This module contains all the process for the latent space of the audio autoencoder."""
+import random
+
 import torch
 from torch import nn
+from torch.nn import functional as F
 
 from audioenhancer.model.audio_ae.expert import Expert
 from audioenhancer.model.audio_ae.mamba import MambaBlock
@@ -76,7 +79,7 @@ class LatentProcessor(nn.Module):
     This module processes the latent space of the audio autoencoder.
     """
 
-    def __init__(self, in_dim: int, out_dim: int, latent_dim, num_layer, num_expert=1):
+    def __init__(self, in_dim: int, out_dim: int, latent_dim, num_layer, noise_grad=1):
         super().__init__()
         self.latent_dim = latent_dim
         self.num_layer = num_layer
@@ -85,9 +88,11 @@ class LatentProcessor(nn.Module):
         self.in_proj = nn.Linear(in_dim, latent_dim)
 
         self.out_proj = nn.Linear(latent_dim, out_dim)
-        self.num_expert = num_expert
 
         self.mambas = nn.ModuleList([MambaBlock(config) for _ in range(num_layer)])
+        self.unknow_noise = nn.Parameter(torch.randn(latent_dim))
+        self.noise_embed = nn.Embedding(noise_grad, latent_dim)
+        self.noise_head = nn.Linear(latent_dim, noise_grad)
         # self.pre_process = nn.Sequential(
         #     MambaBlock(config),
         #     MambaBlock(config),
@@ -104,14 +109,32 @@ class LatentProcessor(nn.Module):
         x = self.pre_process(x)
         return self.classifier(x)
 
-    def forward(self, x, classes):
+    def forward(self, x, noise, gen_noise=False, noise_label=None):
+        bzs = x.size(0)
         h = self.in_proj(x)
+        if noise is not None and not gen_noise:
+            noise = self.noise_embed(noise).reshape(bzs, 1, -1)
+            h = torch.cat([h, noise], dim=1)
+            gen_noise = True
+        else:
+            noise = self.unknow_noise.reshape(1, 1, -1).repeat(bzs, 1, 1)
+            h = torch.cat([h, noise], dim=1)
+
         # h = self.pre_process(h)
         for mamba in self.mambas:
-            h = mamba(h)
+            h = mamba(h, gen_noise=gen_noise)
         # if classes is not None:
         #     return x * classes[:, None, None, 0] + self.out_proj(h) * classes[:, None, None, 1]
-        return self.out_proj(h)
+
+        logits = self.noise_head(h[:, -1])
+        h = h[:, :-1]
+        if noise_label is not None:
+            if not gen_noise:
+                return self.out_proj(h), 0
+            loss = F.cross_entropy(logits.view(-1, logits.size(-1)), noise_label.view(-1))
+            return self.out_proj(h), loss
+
+        return self.out_proj(h), logits
 
     # expert
     # def forward(self, x, expert_id=None):
